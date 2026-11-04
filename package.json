@@ -21,6 +21,7 @@
     "vite": "^8.3.5"
   },
   "dependencies": {
+    "@aws-amplify/ui-react": "^6.15.7",
     "aws-amplify": "^6.22.2",
     "canvas-confetti": "^1.9.4",
     "hls.js": "^1.7.4",

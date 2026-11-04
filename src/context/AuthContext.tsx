@@ -3,6 +3,7 @@ import {
   signIn as amplifySignIn, 
   signUp as amplifySignUp, 
   confirmSignUp as amplifyConfirmSignUp, 
+  resendSignUpCode as amplifyResendSignUpCode,
   signOut as amplifySignOut, 
   getCurrentUser, 
   fetchUserAttributes, 
@@ -21,6 +22,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<AuthUser>;
   register: (data: SignUpData) => Promise<{ isSignUpComplete: boolean; userId?: string }>;
   confirmRegistration: (email: string, code: string) => Promise<boolean>;
+  resendCode: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   switchMockRole: (role: UserRole) => void;
 }
@@ -36,7 +38,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Extract role from Cognito groups or custom:role attribute
   const resolveRoleFromCognito = (attributes: Record<string, string | undefined>, session: any): UserRole => {
-    // 1. Check custom attribute custom:role
     if (attributes['custom:role']) {
       const customRole = attributes['custom:role'].toLowerCase();
       if (customRole === 'admin' || customRole === 'teacher' || customRole === 'student') {
@@ -44,7 +45,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     }
 
-    // 2. Check Cognito User Pool Groups in ID Token claims
     const groups = session?.tokens?.idToken?.payload?.['cognito:groups'] as string[] | undefined;
     if (Array.isArray(groups)) {
       if (groups.includes('Admin') || groups.includes('admin')) return 'admin';
@@ -52,15 +52,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (groups.includes('Student') || groups.includes('student')) return 'student';
     }
 
-    return 'student'; // Default fallback
+    return 'student';
   };
 
-  // Initial session check
   useEffect(() => {
     const initAuth = async () => {
       setIsLoading(true);
       if (!awsConfig.isConfigured) {
-        // Mock mode: restore saved mock user or default to student
         const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
         if (saved) {
           try {
@@ -89,7 +87,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           isMock: false,
         });
       } catch (err) {
-        // No active Cognito session
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -103,7 +100,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     try {
       if (!awsConfig.isConfigured) {
-        // Mock login
         const role: UserRole = email.includes('admin') ? 'admin' : 'student';
         const mockUser: AuthUser = {
           userId: `usr_${Date.now()}`,
@@ -117,7 +113,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return mockUser;
       }
 
-      // AWS Cognito Login
       const signInResult = await amplifySignIn({ username: email, password });
       if (signInResult.isSignedIn) {
         const currentUser = await getCurrentUser();
@@ -158,7 +153,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return { isSignUpComplete: true, userId: mockUser.userId };
       }
 
-      // AWS Cognito Sign Up with custom:role & name attributes
       const result = await amplifySignUp({
         username: data.email,
         password: data.password,
@@ -166,7 +160,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           userAttributes: {
             email: data.email,
             name: data.name,
-            'custom:role': data.role,
           },
         },
       });
@@ -193,6 +186,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return result.isSignUpComplete;
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const resendCode = async (email: string): Promise<void> => {
+    if (awsConfig.isConfigured) {
+      await amplifyResendSignUpCode({ username: email });
     }
   };
 
@@ -226,6 +225,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         login,
         register,
         confirmRegistration,
+        resendCode,
         logout,
         switchMockRole,
       }}
@@ -242,4 +242,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

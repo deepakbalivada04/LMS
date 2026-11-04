@@ -10,9 +10,15 @@ export interface HardwareItem {
 export interface WiringDiagram {
   id: string;
   title: string;
-  imageUrl: string;
+  diagramType: 'l298n-motor' | 'ultrasonic-divider' | 'servo-bus' | 'relay-pump';
   description: string;
   voltageWarning?: string;
+  pinConnections: {
+    from: string;
+    to: string;
+    signalType: 'PWM' | 'GPIO' | 'Power' | 'Ground' | 'Analog' | 'Serial';
+    color: string;
+  }[];
 }
 
 export interface CodeSnippet {
@@ -23,26 +29,33 @@ export interface CodeSnippet {
   description: string;
 }
 
-export interface Module {
-  moduleId: string;
+export interface ProjectStage {
+  stageId: string;
+  moduleId: string; // compatibility with backend
   title: string;
   description: string;
   durationMinutes: number;
-  videoUrl: string; // HLS stream .m3u8 or MP4 fallback
+  videoUrl: string;
   hardwareChecklist: HardwareItem[];
   wiringDiagrams: WiringDiagram[];
   codeSnippets: CodeSnippet[];
 }
 
-export interface Course {
-  courseId: string;
+export interface HardwareProject {
+  projectId: string;
+  courseId: string; // compatibility with backend
   title: string;
   description: string;
   level: 'Beginner' | 'Intermediate' | 'Advanced';
   hardwareKit: string;
-  thumbnailUrl: string;
-  modules: Module[];
+  category: 'Robotics' | 'Autonomous Vehicles' | 'IoT & Cloud' | 'Kinematics';
+  accentColor: string;
+  modules: ProjectStage[];
 }
+
+// Backward-compatibility aliases
+export type Course = HardwareProject;
+export type Module = ProjectStage;
 
 export interface UserProgress {
   userId: string;
@@ -53,4 +66,3 @@ export interface UserProgress {
   certificateUrl?: string;
   lastUpdated?: string;
 }
-

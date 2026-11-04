@@ -22,7 +22,6 @@ import {
   FileText,
   PlayCircle,
   Lock,
-  Sparkles,
   CheckCheck
 } from 'lucide-react';
 
@@ -51,7 +50,7 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
     setIsMarkingComplete(true);
     try {
       await markModuleComplete(course.courseId, activeModule.moduleId);
-      setShowToast(`Lesson "${activeModule.title}" marked as complete!`);
+      setShowToast(`Module "${activeModule.title}" completed!`);
 
       setTimeout(() => {
         setShowToast(null);
@@ -79,33 +78,35 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-950 text-slate-100 min-h-screen">
+    <div className="flex-1 flex flex-col space-y-6 max-w-[1600px] mx-auto w-full">
       {/* Toast Notification */}
       {showToast && (
-        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-xl bg-slate-900 border border-indigo-500 text-white text-xs font-semibold flex items-center gap-3 shadow-2xl backdrop-blur-md animate-bounce">
-          <CheckCheck className="w-5 h-5 text-indigo-400" />
+        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-2xl bg-white border border-sky-200 text-slate-800 text-xs font-bold flex items-center gap-3 shadow-xl animate-bounce">
+          <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-500 flex items-center justify-center">
+            <CheckCheck className="w-4 h-4" />
+          </div>
           <span>{showToast}</span>
         </div>
       )}
 
-      {/* TOP STANDARD LMS HEADER BAR (Udemy / Coursera Style) */}
-      <div className="h-14 bg-slate-900 border-b border-slate-800 px-4 sm:px-6 flex items-center justify-between gap-4 sticky top-16 z-40">
-        {/* Left: Course Title & Back button */}
-        <div className="flex items-center gap-3 min-w-0">
+      {/* TOP STUDENT TOOLBAR */}
+      <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-100 flex items-center justify-between gap-4">
+        {/* Left: Back button & Title */}
+        <div className="flex items-center gap-3.5 min-w-0">
           <Link
             to="/dashboard"
-            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition shrink-0"
+            className="w-10 h-10 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition shrink-0"
             title="Back to Dashboard"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <div className="h-4 w-px bg-slate-800 hidden sm:block" />
+          <div className="h-6 w-px bg-slate-100 hidden sm:block" />
           <div className="truncate">
-            <h1 className="text-sm font-bold text-white truncate leading-tight">
+            <h1 className="text-sm font-extrabold text-slate-800 truncate">
               {course.title}
             </h1>
-            <span className="text-[11px] text-slate-400 hidden sm:inline">
-              Lesson {activeModuleIndex + 1} of {course.modules.length}
+            <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+              Project Stage {activeModuleIndex + 1} of {course.modules.length}
             </span>
           </div>
         </div>
@@ -115,14 +116,14 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
           {/* Progress display */}
           <div className="hidden md:flex items-center gap-3">
             <div className="text-right">
-              <span className="text-[11px] text-slate-400 block font-medium">Your Progress</span>
-              <span className="text-xs font-bold text-white">
+              <span className="text-[10px] text-slate-400 block font-bold uppercase">Progress</span>
+              <span className="text-xs font-extrabold text-sky-600">
                 {progress.completionPercentage}% Complete
               </span>
             </div>
-            <div className="w-24 h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
               <div
-                className="h-full bg-indigo-600 rounded-full transition-all duration-500"
+                className="h-full bg-[#0ea5e9] rounded-full transition-all duration-500"
                 style={{ width: `${progress.completionPercentage}%` }}
               />
             </div>
@@ -132,80 +133,77 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
           {isAllModulesCompleted && (
             <button
               onClick={() => navigate(`/course/${course.courseId}/exam`)}
-              className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition flex items-center gap-1 shadow-md shadow-amber-500/20"
+              className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-900 text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
             >
-              <Award className="w-3.5 h-3.5" />
+              <Award className="w-4 h-4" />
               Take Exam
             </button>
           )}
 
-          {/* Theater Mode / Sidebar Toggle Button */}
+          {/* Sidebar Toggle Button */}
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition"
-            title={isSidebarOpen ? 'Collapse Course Content' : 'Expand Course Content'}
+            className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold flex items-center gap-1.5 transition"
+            title={isSidebarOpen ? 'Hide Course Syllabus' : 'Show Course Syllabus'}
           >
             {isSidebarOpen ? (
               <>
-                <PanelRightClose className="w-4 h-4 text-slate-400" />
-                <span className="hidden sm:inline">Hide Content</span>
+                <PanelRightClose className="w-4 h-4 text-slate-500" />
+                <span className="hidden sm:inline">Hide Syllabus</span>
               </>
             ) : (
               <>
-                <PanelRightOpen className="w-4 h-4 text-indigo-400" />
-                <span className="hidden sm:inline">Course Content</span>
+                <PanelRightOpen className="w-4 h-4 text-sky-500" />
+                <span className="hidden sm:inline">View Syllabus</span>
               </>
             )}
           </button>
         </div>
       </div>
 
-      {/* MAIN CONTENT SPLIT VIEW */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* MAIN SPLIT-VIEW */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* ========================================================= */}
         {/* LEFT / CENTER VIEWPORT (VIDEO PLAYER & LAB SUBSYSTEM TABS) */}
         {/* ========================================================= */}
-        <div className="flex-1 flex flex-col overflow-y-auto">
-          {/* Video Container (Cinema/Player container) */}
-          <div className="bg-black flex justify-center items-center w-full">
-            <div className="w-full max-w-5xl aspect-video max-h-[70vh]">
-              <HlsVideoPlayer
-                key={activeModule.videoUrl}
-                src={activeModule.videoUrl}
-                title={activeModule.title}
-                poster={course.thumbnailUrl}
-                onEnded={() => {
-                  if (!isCurrentModuleDone) {
-                    handleMarkAsComplete();
-                  }
-                }}
-              />
-            </div>
+        <div className={`${isSidebarOpen ? 'lg:col-span-8' : 'lg:col-span-12'} space-y-6 transition-all duration-300`}>
+          {/* Video Card */}
+          <div className="bg-black rounded-3xl overflow-hidden shadow-lg border border-slate-100">
+            <HlsVideoPlayer
+              key={activeModule.videoUrl}
+              src={activeModule.videoUrl}
+              title={activeModule.title}
+              onEnded={() => {
+                if (!isCurrentModuleDone) {
+                  handleMarkAsComplete();
+                }
+              }}
+            />
           </div>
 
-          {/* Lesson Action Bar: Prev / Next / Mark as Complete */}
-          <div className="border-b border-slate-800 bg-slate-900 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Lesson Action Bar */}
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 text-xs text-indigo-400 font-semibold mb-1">
+              <div className="flex items-center gap-2 text-xs text-sky-500 font-bold mb-1">
                 <span>MODULE {activeModuleIndex + 1}</span>
                 <span>•</span>
-                <span className="flex items-center gap-1 text-slate-400 font-normal">
+                <span className="flex items-center gap-1 text-slate-400 font-medium">
                   <Clock className="w-3.5 h-3.5" />
                   {activeModule.durationMinutes} mins
                 </span>
               </div>
-              <h2 className="text-xl font-bold text-white leading-tight">
+              <h2 className="text-xl font-extrabold text-slate-800 leading-tight">
                 {activeModule.title}
               </h2>
             </div>
 
-            {/* Actions */}
+            {/* Actions: Prev / Complete / Next */}
             <div className="flex items-center gap-3 shrink-0">
               <button
                 type="button"
                 onClick={handlePrevModule}
                 disabled={activeModuleIndex === 0}
-                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40 disabled:pointer-events-none text-xs font-semibold flex items-center gap-1 transition"
+                className="px-3.5 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 disabled:opacity-40 disabled:pointer-events-none text-xs font-bold flex items-center gap-1 transition"
               >
                 <ChevronLeft className="w-4 h-4" />
                 Previous
@@ -215,21 +213,21 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
                 type="button"
                 onClick={handleMarkAsComplete}
                 disabled={isMarkingComplete}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-md ${
+                className={`px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-md ${
                   isCurrentModuleDone
-                    ? 'bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20'
-                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
+                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                    : 'bg-[#0ea5e9] hover:bg-[#0284c7] text-white shadow-sky-500/20'
                 }`}
               >
                 {isCurrentModuleDone ? (
                   <>
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>{isSyncingWithAWS ? 'Syncing...' : 'Completed'}</span>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <span>{isSyncingWithAWS ? 'Syncing...' : 'Completed ✓'}</span>
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>{isSyncingWithAWS ? 'Saving...' : 'Mark as Complete & Next'}</span>
+                    <span>{isSyncingWithAWS ? 'Saving to DynamoDB...' : 'Mark as Complete & Next'}</span>
                   </>
                 )}
               </button>
@@ -238,7 +236,7 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
                 type="button"
                 onClick={handleNextModule}
                 disabled={activeModuleIndex === course.modules.length - 1}
-                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40 disabled:pointer-events-none text-xs font-semibold flex items-center gap-1 transition"
+                className="px-3.5 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 disabled:opacity-40 disabled:pointer-events-none text-xs font-bold flex items-center gap-1 transition"
               >
                 Next
                 <ChevronRight className="w-4 h-4" />
@@ -246,16 +244,16 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
             </div>
           </div>
 
-          {/* LOWER LAB & LESSON TABS (Coursera / edX Style) */}
-          <div className="p-6 max-w-5xl w-full mx-auto flex-1">
-            {/* Standard Tab Navigation */}
-            <div className="flex border-b border-slate-800 gap-6 text-sm font-medium mb-6">
+          {/* LOWER LAB TABS (Hardware / Wiring / Code / Overview) */}
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+            {/* Tabs Header */}
+            <div className="flex border-b border-slate-100 gap-6 text-xs sm:text-sm font-bold mb-6 overflow-x-auto pb-1">
               <button
                 onClick={() => setActiveTab('hardware')}
-                className={`pb-3 flex items-center gap-2 transition border-b-2 -mb-px ${
+                className={`pb-3 flex items-center gap-2 transition border-b-2 -mb-px shrink-0 ${
                   activeTab === 'hardware'
-                    ? 'border-indigo-500 text-indigo-400 font-semibold'
-                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                    ? 'border-sky-500 text-sky-600'
+                    : 'border-transparent text-slate-400 hover:text-slate-700'
                 }`}
               >
                 <Wrench className="w-4 h-4" />
@@ -264,10 +262,10 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
 
               <button
                 onClick={() => setActiveTab('wiring')}
-                className={`pb-3 flex items-center gap-2 transition border-b-2 -mb-px ${
+                className={`pb-3 flex items-center gap-2 transition border-b-2 -mb-px shrink-0 ${
                   activeTab === 'wiring'
-                    ? 'border-indigo-500 text-indigo-400 font-semibold'
-                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                    ? 'border-sky-500 text-sky-600'
+                    : 'border-transparent text-slate-400 hover:text-slate-700'
                 }`}
               >
                 <Layers className="w-4 h-4" />
@@ -276,10 +274,10 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
 
               <button
                 onClick={() => setActiveTab('code')}
-                className={`pb-3 flex items-center gap-2 transition border-b-2 -mb-px ${
+                className={`pb-3 flex items-center gap-2 transition border-b-2 -mb-px shrink-0 ${
                   activeTab === 'code'
-                    ? 'border-indigo-500 text-indigo-400 font-semibold'
-                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                    ? 'border-sky-500 text-sky-600'
+                    : 'border-transparent text-slate-400 hover:text-slate-700'
                 }`}
               >
                 <FileCode className="w-4 h-4" />
@@ -288,10 +286,10 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
 
               <button
                 onClick={() => setActiveTab('overview')}
-                className={`pb-3 flex items-center gap-2 transition border-b-2 -mb-px ${
+                className={`pb-3 flex items-center gap-2 transition border-b-2 -mb-px shrink-0 ${
                   activeTab === 'overview'
-                    ? 'border-indigo-500 text-indigo-400 font-semibold'
-                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                    ? 'border-sky-500 text-sky-600'
+                    : 'border-transparent text-slate-400 hover:text-slate-700'
                 }`}
               >
                 <FileText className="w-4 h-4" />
@@ -300,7 +298,7 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
             </div>
 
             {/* Tab Contents */}
-            <div className="pb-12">
+            <div>
               {activeTab === 'hardware' && (
                 <HardwareChecklistTab items={activeModule.hardwareChecklist} />
               )}
@@ -311,18 +309,18 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
                 <CodeSnippetsTab snippets={activeModule.codeSnippets} />
               )}
               {activeTab === 'overview' && (
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-slate-300 text-sm space-y-4">
-                  <h3 className="text-base font-bold text-white">Lesson Summary & Objectives</h3>
-                  <p className="leading-relaxed text-slate-400">{activeModule.description}</p>
+                <div className="space-y-4 text-xs sm:text-sm text-slate-600">
+                  <h3 className="font-bold text-slate-800 text-base">Lesson Overview</h3>
+                  <p className="leading-relaxed text-slate-500">{activeModule.description}</p>
                   
-                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                    <span className="text-xs font-semibold text-slate-200 block uppercase tracking-wider">
-                      Hardware Learning Outcomes
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                      Hardware Objectives
                     </span>
-                    <ul className="list-disc list-inside text-xs text-slate-400 space-y-1">
-                      <li>Verify micro-controller GPIO routing and logic levels (3.3V vs 5V).</li>
-                      <li>Safely wire dual H-Bridge PWM motor channels with common ground isolation.</li>
-                      <li>Flash firmware and verify motor direction and ultrasound telemetry in real time.</li>
+                    <ul className="list-disc list-inside text-xs text-slate-500 space-y-1">
+                      <li>Check ESP32 pinout voltage levels (protect GPIO with level shifting).</li>
+                      <li>Tie common ground between high-current battery and logic rail.</li>
+                      <li>Deploy motor PWM speed controls and test ultrasonic telemetry.</li>
                     </ul>
                   </div>
                 </div>
@@ -332,29 +330,24 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
         </div>
 
         {/* ========================================================= */}
-        {/* RIGHT COLLAPSIBLE COURSE CURRICULUM SIDEBAR (UDEMY STYLE) */}
+        {/* RIGHT COLLAPSIBLE COURSE SYLLABUS                         */}
         {/* ========================================================= */}
         {isSidebarOpen && (
-          <aside className="w-80 lg:w-96 border-l border-slate-800 bg-slate-900 flex flex-col shrink-0 overflow-y-auto">
-            {/* Sidebar Header */}
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between sticky top-0 bg-slate-900 z-10">
+          <aside className="lg:col-span-4 bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <h3 className="font-bold text-sm text-white">Course Content</h3>
+                <h3 className="font-extrabold text-sm text-slate-800">Project Build Stages</h3>
                 <span className="text-[11px] text-slate-400">
-                  {progress.completedModules.length} / {course.modules.length} completed
+                  {progress.completedModules.length} of {course.modules.length} video stages completed
                 </span>
               </div>
-              <button
-                onClick={() => setIsSidebarOpen(false)}
-                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
-                title="Hide sidebar"
-              >
-                <PanelRightClose className="w-4 h-4" />
-              </button>
+              <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-500 flex items-center justify-center font-bold text-xs">
+                {progress.completionPercentage}%
+              </div>
             </div>
 
-            {/* Curriculum Modules List */}
-            <div className="divide-y divide-slate-800/60 flex-1">
+            {/* Lessons List */}
+            <div className="space-y-2">
               {course.modules.map((mod, idx) => {
                 const isDone = isModuleCompleted(course.courseId, mod.moduleId);
                 const isActive = idx === activeModuleIndex;
@@ -363,71 +356,67 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
                   <div
                     key={mod.moduleId}
                     onClick={() => setActiveModuleIndex(idx)}
-                    className={`p-4 transition cursor-pointer select-none flex items-start gap-3 ${
+                    className={`p-3.5 rounded-2xl transition cursor-pointer select-none flex items-start gap-3 border ${
                       isActive
-                        ? 'bg-slate-800/80 border-l-4 border-indigo-500 pl-3'
-                        : 'hover:bg-slate-800/40'
+                        ? 'bg-sky-50/70 border-sky-300 text-sky-950 shadow-xs'
+                        : 'bg-white border-slate-100 hover:bg-slate-50'
                     }`}
                   >
-                    {/* Completion Status Checkbox */}
                     <div className="mt-0.5 shrink-0">
                       {isDone ? (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-emerald-500/20" />
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                       ) : (
-                        <Circle className="w-5 h-5 text-slate-600 hover:text-slate-400" />
+                        <Circle className="w-5 h-5 text-slate-300 hover:text-slate-400" />
                       )}
                     </div>
 
-                    {/* Lesson Details */}
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-semibold text-white leading-snug truncate">
+                      <div className="text-xs font-bold text-slate-800 leading-snug truncate">
                         {idx + 1}. {mod.title}
                       </div>
 
-                      <div className="flex items-center gap-2 mt-1.5 text-[11px] text-slate-400">
+                      <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-400">
                         <span className="flex items-center gap-1">
-                          <PlayCircle className="w-3.5 h-3.5 text-indigo-400" />
+                          <PlayCircle className="w-3.5 h-3.5 text-sky-500" />
                           {mod.durationMinutes}m
                         </span>
                         <span>•</span>
                         <span>{mod.hardwareChecklist.length} parts</span>
-                        <span>•</span>
-                        <span>{mod.codeSnippets.length} files</span>
                       </div>
                     </div>
                   </div>
                 );
               })}
 
-              {/* End of Course Exam Card in Sidebar */}
+              {/* End of Course Exam Card */}
               <div
                 onClick={() => {
                   if (isAllModulesCompleted) {
                     navigate(`/course/${course.courseId}/exam`);
                   }
                 }}
-                className={`p-4 transition flex items-start gap-3 ${
+                className={`p-4 rounded-2xl transition flex items-start gap-3 border ${
                   isAllModulesCompleted
-                    ? 'hover:bg-amber-500/10 cursor-pointer border-t border-amber-500/30'
-                    : 'opacity-60 cursor-not-allowed'
+                    ? 'bg-amber-50/60 border-amber-300 hover:bg-amber-50 cursor-pointer shadow-xs'
+                    : 'bg-slate-50 border-slate-100 opacity-60 cursor-not-allowed'
                 }`}
               >
                 <div className="mt-0.5 shrink-0">
                   {isAllModulesCompleted ? (
-                    <Award className="w-5 h-5 text-amber-400" />
+                    <Award className="w-5 h-5 text-amber-500" />
                   ) : (
-                    <Lock className="w-5 h-5 text-slate-500" />
+                    <Lock className="w-5 h-5 text-slate-400" />
                   )}
                 </div>
 
                 <div>
-                  <div className="text-xs font-bold text-slate-200">
+                  <div className="text-xs font-bold text-slate-800">
                     Final Certification Exam
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
+                  <p className="text-[11px] text-slate-500 mt-0.5">
                     {isAllModulesCompleted
                       ? 'All lessons complete! Click to start exam.'
-                      : 'Complete all lessons to unlock exam.'}
+                      : 'Complete all lessons to unlock.'}
                   </p>
                 </div>
               </div>

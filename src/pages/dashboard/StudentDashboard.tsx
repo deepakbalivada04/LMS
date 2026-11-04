@@ -1,402 +1,290 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { SAMPLE_COURSES } from '../../lib/mockData';
+import { Link } from 'react-router-dom';
+import { SAMPLE_PROJECTS } from '../../lib/mockData';
 import { useProgress } from '../../context/ProgressContext';
 import { useAuth } from '../../context/AuthContext';
 import { 
-  GraduationCap, 
-  Users, 
-  Plus, 
-  MoreVertical, 
-  Calendar, 
-  ArrowUpRight, 
   Play, 
-  TrendingUp, 
+  CheckCircle2, 
+  Clock, 
+  Cpu, 
   Award, 
-  ChevronRight,
-  Bot,
-  Cpu,
-  Sparkles
+  Sparkles, 
+  Wrench, 
+  Boxes, 
+  Layers, 
+  Radio,
+  ArrowRight
 } from 'lucide-react';
 
 export const StudentDashboard: React.FC = () => {
   const { user } = useAuth();
   const { getCourseProgress } = useProgress();
-  const navigate = useNavigate();
 
-  const esp32Progress = getCourseProgress('crs-esp32-rover');
+  const studentFirstName = user?.name ? user.name.split(' ')[0] : 'Student';
 
-  const popularCourses = [
-    {
-      id: 'crs-esp32-rover',
-      badgeLetter: 'U',
-      badgeBg: 'bg-amber-400 text-white',
-      title: 'UI/UX & Autonomous ESP32 Rover',
-      coursesCount: '30+ Modules',
-      path: '/course/crs-esp32-rover',
-    },
-    {
-      id: 'crs-robotic-arm-kinematics',
-      badgeLetter: 'M',
-      badgeBg: 'bg-rose-500 text-white',
-      title: '6-DOF Robotic Arm & Kinematics',
-      coursesCount: '25+ Modules',
-      path: '/course/crs-robotic-arm-kinematics',
-    },
-    {
-      id: 'web-iot',
-      badgeLetter: 'W',
-      badgeBg: 'bg-teal-500 text-white',
-      title: 'Web Dev & Micro-XRCE Telemetry',
-      coursesCount: '30+ Modules',
-      path: '/course/crs-esp32-rover',
-    },
-    {
-      id: 'math-kinematics',
-      badgeLetter: 'M',
-      badgeBg: 'bg-sky-500 text-white',
-      title: 'Mathematics & Kinematic Control',
-      coursesCount: '50+ Modules',
-      path: '/course/crs-robotic-arm-kinematics',
-    },
-  ];
+  // Featured Project Kit: ESP32 Rover
+  const activeProject = SAMPLE_PROJECTS[0];
+  const activeProgress = getCourseProgress(activeProject.courseId);
 
-  const bestInstructors = [
-    {
-      name: 'Nil Yeager',
-      role: '5 Design Course',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80',
-    },
-    {
-      name: 'Theron Trump',
-      role: '5 Design Course',
-      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=120&q=80',
-    },
-    {
-      name: 'Tyler Mark',
-      role: '5 Design Course',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80',
-    },
-    {
-      name: 'Johen Mark',
-      role: '5 Design Course',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=120&q=80',
-    },
-  ];
+  // Compute live progress stats
+  const totalProjects = SAMPLE_PROJECTS.length;
+  const completedProjects = SAMPLE_PROJECTS.filter((p) => getCourseProgress(p.courseId).completionPercentage >= 100).length;
+  const totalStagesCompleted = SAMPLE_PROJECTS.reduce(
+    (acc, p) => acc + getCourseProgress(p.courseId).completedModules.length,
+    0
+  );
 
   return (
-    <div className="space-y-6 max-w-[1600px] mx-auto">
-      {/* ======================================================== */}
-      {/* TOP ROW: GREEN HERO BANNER (LEFT) + ACTION CARD (RIGHT)  */}
-      {/* ======================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        {/* Large Teal Hero Banner matching screenshot */}
-        <div className="lg:col-span-8 bg-gradient-to-r from-[#2bb398] via-[#24a58b] to-[#1e967d] rounded-3xl p-8 sm:p-10 text-white relative overflow-hidden shadow-sm flex flex-col justify-between min-h-[220px]">
-          {/* Subtle gradient pattern */}
-          <div className="absolute right-0 top-0 bottom-0 w-1/2 opacity-20 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent" />
-
-          {/* Banner Text Header */}
-          <div className="max-w-md relative z-10">
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2">
-              Learn With Effectively With Us!
-            </h1>
-            <p className="text-emerald-100 text-xs sm:text-sm font-medium">
-              Hardware, robotics, & embedded cloud telemetry labs. Get 30% off every course on january.
-            </p>
+    <div className="space-y-8 max-w-6xl mx-auto py-2">
+      {/* ========================================================= */}
+      {/* 1. HERO BANNER: ACTIVE ROBOTICS PROJECT SPOTLIGHT         */}
+      {/* ========================================================= */}
+      <div className="bg-gradient-to-br from-[#2bb398] via-[#24a58b] to-[#1e967d] rounded-3xl p-8 sm:p-10 text-white shadow-sm relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="max-w-xl relative z-10">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-emerald-100 text-xs font-semibold mb-3">
+            <Radio className="w-3.5 h-3.5 text-emerald-200 animate-pulse" />
+            <span>Hardware Project Workbench Online</span>
           </div>
 
-          {/* Banner Stat Badges (Red + Yellow pills from screenshot) */}
-          <div className="flex flex-wrap items-center gap-4 mt-6 relative z-10">
-            {/* Red Badge: Students */}
-            <div className="flex items-center gap-3 bg-white/15 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/20">
-              <div className="w-8 h-8 rounded-full bg-rose-500 flex items-center justify-center text-white shadow-sm">
-                <GraduationCap className="w-4 h-4" />
-              </div>
-              <div className="text-left">
-                <span className="text-[11px] text-emerald-100 block font-medium">Students</span>
-                <span className="text-xs font-bold text-white">75,000+</span>
-              </div>
-            </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight mb-2">
+            Build Real Robotics Projects with Hardware Kits
+          </h1>
+          <p className="text-emerald-100 text-xs sm:text-sm font-medium leading-relaxed">
+            Welcome back, <span className="text-white font-bold">{studentFirstName}</span>. Step-by-step video instructions, live wiring schematics, and embedded C++/Python code to program your physical microcontroller kits.
+          </p>
 
-            {/* Yellow Badge: Mentors */}
-            <div className="flex items-center gap-3 bg-white/15 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/20">
-              <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center text-slate-900 shadow-sm">
-                <Users className="w-4 h-4" />
-              </div>
-              <div className="text-left">
-                <span className="text-[11px] text-emerald-100 block font-medium">Expert Mentors</span>
-                <span className="text-xs font-bold text-white">200+</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Floating Graduating Figures Graphic (matching screenshot) */}
-          <div className="hidden md:flex absolute right-6 bottom-4 items-end gap-2 pointer-events-none select-none">
-            <div className="text-7xl opacity-90 drop-shadow-md">👨‍🎓</div>
-            <div className="text-8xl opacity-95 drop-shadow-md -ml-3">👩‍🎓</div>
-            <div className="text-7xl opacity-90 drop-shadow-md -ml-3">🧑‍🎓</div>
-          </div>
-        </div>
-
-        {/* Right Side: Have More Knowledge to share Card */}
-        <div className="lg:col-span-4 bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-slate-100 flex flex-col justify-between">
-          <div className="text-center">
-            <h2 className="text-sm font-bold text-slate-800 leading-snug">
-              Have More knowledge to share?
-            </h2>
-            <p className="text-slate-400 text-xs mt-0.5">
-              Launch new hardware modules or start your active lab
-            </p>
-
-            {/* Blue Button: + Create New Course / Launch Lab */}
+          <div className="mt-6 flex flex-wrap items-center gap-4">
             <Link
-              to="/course/crs-esp32-rover"
-              className="mt-4 w-full py-3 px-4 rounded-xl bg-[#0ea5e9] hover:bg-[#0284c7] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-sky-500/20 transition transform active:scale-98"
+              to={`/course/${activeProject.courseId}`}
+              className="py-3 px-6 rounded-2xl bg-white text-emerald-900 font-bold text-xs sm:text-sm inline-flex items-center gap-2 shadow-md hover:bg-emerald-50 transition transform active:scale-95"
             >
-              <Plus className="w-4 h-4 stroke-[3]" />
-              Create New Course / Launch Lab
+              <Play className="w-4 h-4 fill-current text-emerald-700" />
+              Resume Active Project ({activeProgress.completionPercentage}%)
+            </Link>
+
+            <Link
+              to={`/course/${activeProject.courseId}/exam`}
+              className="py-3 px-5 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-semibold text-xs inline-flex items-center gap-2 border border-white/20 backdrop-blur-md transition"
+            >
+              <Award className="w-4 h-4 text-amber-300" />
+              Project Certification
             </Link>
           </div>
+        </div>
 
-          {/* Two Stats Boxes (Courses in Progress: 5, Forum Discussion: 25) */}
-          <div className="grid grid-cols-2 gap-3 mt-6">
-            <div className="bg-[#f8fafc] rounded-2xl p-4 text-center border border-slate-100">
-              <span className="text-[11px] font-semibold text-sky-500 block">Courses in Progress</span>
-              <span className="text-3xl font-extrabold text-slate-800 mt-1 block">5</span>
+        {/* Live Project Card Widget */}
+        <div className="bg-white/15 backdrop-blur-md border border-white/25 rounded-2xl p-5 text-white min-w-[240px] shrink-0 relative z-10">
+          <div className="flex items-center justify-between text-[11px] text-emerald-100 uppercase tracking-wider font-bold mb-1">
+            <span>Current Project Kit</span>
+            <span className="text-amber-300">Live Lab</span>
+          </div>
+
+          <span className="text-sm font-bold block leading-snug">
+            {activeProject.title}
+          </span>
+          <span className="text-[11px] text-emerald-100 block mt-1">
+            Stage 1: Chassis Assembly & Dual PWM
+          </span>
+
+          <div className="mt-4 pt-2 border-t border-white/20">
+            <div className="flex items-center justify-between text-xs font-semibold mb-1.5">
+              <span>Build Progress</span>
+              <span>{activeProgress.completionPercentage}%</span>
             </div>
-            <div className="bg-[#f8fafc] rounded-2xl p-4 text-center border border-slate-100">
-              <span className="text-[11px] font-semibold text-sky-500 block">Forum Discussion</span>
-              <span className="text-3xl font-extrabold text-slate-800 mt-1 block">25</span>
+            <div className="w-full h-2 bg-black/20 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-white rounded-full transition-all duration-500"
+                style={{ width: `${activeProgress.completionPercentage}%` }}
+              />
             </div>
           </div>
         </div>
       </div>
 
-      {/* ======================================================== */}
-      {/* MIDDLE SECTION (3 EQUAL COLUMNS)                        */}
-      {/* 1. Popular Courses | 2. Current Activity | 3. Instructors*/}
-      {/* ======================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* COLUMN 1: POPULAR COURSES */}
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="font-bold text-sm text-slate-800">Popular Courses</h3>
-            <Link to="/dashboard" className="text-xs font-semibold text-slate-400 hover:text-sky-500 transition">
-              All Courses
-            </Link>
+      {/* ========================================================= */}
+      {/* 2. STUDENT STATS                                          */}
+      {/* ========================================================= */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl p-5 shadow-xs border border-slate-100 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+            <Boxes className="w-6 h-6" />
           </div>
-
-          <div className="space-y-4">
-            {popularCourses.map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center justify-between p-3 rounded-2xl hover:bg-slate-50 transition border border-transparent hover:border-slate-100 group"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  {/* Badge letter with colored box */}
-                  <div className={`w-10 h-10 rounded-xl ${c.badgeBg} flex items-center justify-center font-bold text-sm shadow-xs shrink-0`}>
-                    {c.badgeLetter}
-                  </div>
-                  <div className="truncate">
-                    <h4 className="text-xs font-bold text-slate-800 truncate group-hover:text-sky-500 transition">
-                      {c.title}
-                    </h4>
-                    <span className="text-[11px] text-slate-400">{c.coursesCount}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <Link
-                    to={c.path}
-                    className="px-2.5 py-1 rounded-full text-[10px] font-bold text-amber-500 bg-amber-50 hover:bg-amber-100 transition"
-                  >
-                    View Courses
-                  </Link>
-                  <button className="text-slate-300 hover:text-slate-500 p-1">
-                    <MoreVertical className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* COLUMN 2: CURRENT ACTIVITY (MONTHLY PROGRESS CHART + 2 METRIC CARDS) */}
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="font-bold text-sm text-slate-800">Current Activity</h3>
-            </div>
-
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <span className="text-xs font-bold text-slate-700 block">Monthly Progress</span>
-                <span className="text-[11px] text-slate-400">This is the latest improvement</span>
-              </div>
-              <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-500 flex items-center justify-center">
-                <Calendar className="w-4 h-4" />
-              </div>
-            </div>
-
-            {/* Smooth Blue Area Line Chart (SVG replicated from screenshot) */}
-            <div className="w-full h-36 relative select-none">
-              <svg className="w-full h-full" viewBox="0 0 320 120" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="blueWave" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.35" />
-                    <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-                {/* Horizontal Guide Lines */}
-                <line x1="30" y1="20" x2="310" y2="20" stroke="#f1f5f9" strokeWidth="1" />
-                <line x1="30" y1="50" x2="310" y2="50" stroke="#f1f5f9" strokeWidth="1" />
-                <line x1="30" y1="80" x2="310" y2="80" stroke="#f1f5f9" strokeWidth="1" />
-
-                {/* Y-Axis Labels */}
-                <text x="5" y="24" fontSize="9" fill="#94a3b8" fontFamily="sans-serif">60%</text>
-                <text x="5" y="54" fontSize="9" fill="#94a3b8" fontFamily="sans-serif">40%</text>
-                <text x="5" y="84" fontSize="9" fill="#94a3b8" fontFamily="sans-serif">20%</text>
-                <text x="10" y="108" fontSize="9" fill="#94a3b8" fontFamily="sans-serif">0%</text>
-
-                {/* Wave Area Fill */}
-                <path
-                  d="M 30,105 Q 60,100 90,80 T 150,75 T 210,50 T 270,30 L 310,22 L 310,105 Z"
-                  fill="url(#blueWave)"
-                />
-
-                {/* Main Blue Stroke Line */}
-                <path
-                  d="M 30,105 Q 60,100 90,80 T 150,75 T 210,50 T 270,30 L 310,22"
-                  fill="none"
-                  stroke="#0284c7"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                />
-
-                {/* X-Axis Labels */}
-                <text x="45" y="118" fontSize="8" fill="#94a3b8" fontFamily="sans-serif">Jan</text>
-                <text x="95" y="118" fontSize="8" fill="#94a3b8" fontFamily="sans-serif">Feb</text>
-                <text x="145" y="118" fontSize="8" fill="#94a3b8" fontFamily="sans-serif">Mar</text>
-                <text x="195" y="118" fontSize="8" fill="#94a3b8" fontFamily="sans-serif">Apr</text>
-                <text x="245" y="118" fontSize="8" fill="#94a3b8" fontFamily="sans-serif">May</text>
-                <text x="290" y="118" fontSize="8" fill="#94a3b8" fontFamily="sans-serif">Jun</text>
-              </svg>
-            </div>
-          </div>
-
-          {/* Two Color Metric Cards Below Chart: Yellow/Amber & Pink/Red */}
-          <div className="grid grid-cols-2 gap-3 mt-4">
-            {/* Yellow Card: 450K+ Completed Course */}
-            <div className="bg-amber-400 rounded-2xl p-4 text-white flex flex-col justify-between shadow-xs">
-              <div>
-                <span className="text-xl font-black block leading-tight">450K+</span>
-                <span className="text-xs font-semibold block opacity-95">Completed Course</span>
-              </div>
-              <div className="flex items-center justify-between mt-3 pt-2">
-                <span className="text-[10px] opacity-80">This is the latest Data</span>
-                <div className="w-6 h-6 rounded-full bg-white/30 flex items-center justify-center text-white">
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                </div>
-              </div>
-            </div>
-
-            {/* Pink Card: 200K+ Video Course */}
-            <div className="bg-[#f43f5e] rounded-2xl p-4 text-white flex flex-col justify-between shadow-xs">
-              <div>
-                <span className="text-xl font-black block leading-tight">200K+</span>
-                <span className="text-xs font-semibold block opacity-95">Video Course</span>
-              </div>
-              <div className="flex items-center justify-between mt-3 pt-2">
-                <span className="text-[10px] opacity-80">HLS Streaming</span>
-                <div className="w-6 h-6 rounded-full bg-white/30 flex items-center justify-center text-white">
-                  <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-                </div>
-              </div>
-            </div>
+            <span className="text-[11px] font-semibold text-slate-400 block uppercase">Project Kits Available</span>
+            <span className="text-2xl font-extrabold text-slate-800">{totalProjects} Kits</span>
           </div>
         </div>
 
-        {/* COLUMN 3: BEST INSTRUCTORS */}
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="font-bold text-sm text-slate-800">Best Instructors</h3>
-            <Link to="/dashboard" className="text-xs font-semibold text-slate-400 hover:text-sky-500 transition">
-              See All
-            </Link>
+        <div className="bg-white rounded-2xl p-5 shadow-xs border border-slate-100 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-6 h-6" />
           </div>
+          <div>
+            <span className="text-[11px] font-semibold text-slate-400 block uppercase">Build Stages Finished</span>
+            <span className="text-2xl font-extrabold text-slate-800">{totalStagesCompleted} Video Stages</span>
+          </div>
+        </div>
 
-          <div className="space-y-4">
-            {bestInstructors.map((inst, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-slate-50 transition border border-transparent hover:border-slate-100"
-              >
-                <div className="flex items-center gap-3">
-                  <img
-                    src={inst.avatar}
-                    alt={inst.name}
-                    className="w-10 h-10 rounded-xl object-cover shadow-xs"
-                  />
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-800">{inst.name}</h4>
-                    <span className="text-[11px] text-slate-400">{inst.role}</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  className="px-3 py-1 rounded-full text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition"
-                >
-                  Courses
-                </button>
-              </div>
-            ))}
+        <div className="bg-white rounded-2xl p-5 shadow-xs border border-slate-100 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <Award className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold text-slate-400 block uppercase">Hardware Certified</span>
+            <span className="text-2xl font-extrabold text-slate-800">{completedProjects} Issued</span>
           </div>
         </div>
       </div>
 
-      {/* ======================================================== */}
-      {/* BOTTOM SECTION: 3 CARDS AS SEEN AT THE BOTTOM OF IMAGE   */}
-      {/* 1. Top 5 Performance | 2. Pass Rate | 3. Content Usage   */}
-      {/* ======================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="font-bold text-xs text-slate-800">Top 5 School Performance</h4>
-            <span className="text-[10px] text-slate-400">Term 2026</span>
+      {/* ========================================================= */}
+      {/* 3. HARDWARE PROJECT KITS (CLEAN VECTOR CARDS)             */}
+      {/* ========================================================= */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-extrabold text-slate-800">
+              Hardware Project Kits
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Select a project kit below to launch the split-screen video workbench, wiring schematics, and firmware files
+            </p>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-slate-800">94.8%</span>
-            <span className="text-xs font-semibold text-emerald-500 flex items-center gap-0.5">
-              <TrendingUp className="w-3.5 h-3.5" /> +4.2%
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">Average robotics microcontroller score</p>
         </div>
 
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="font-bold text-xs text-slate-800">Overall Pass Percentage</h4>
-            <span className="text-[10px] text-slate-400">Exam Metric</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {SAMPLE_PROJECTS.map((project) => {
+            const progress = getCourseProgress(project.courseId);
+            const totalModules = project.modules.length;
+            const completedCount = progress.completedModules.length;
+            const isCompleted = progress.completionPercentage >= 100;
+
+            return (
+              <div
+                key={project.projectId}
+                className="bg-white rounded-3xl overflow-hidden shadow-xs border border-slate-100 flex flex-col justify-between hover:border-slate-200 hover:shadow-md transition duration-200 group"
+              >
+                {/* Visual Project Header Banner */}
+                <div 
+                  className="p-6 text-white relative overflow-hidden"
+                  style={{
+                    background: `linear-gradient(135deg, ${project.accentColor} 0%, #0f172a 100%)`
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="px-2.5 py-1 rounded-xl text-[10px] font-bold uppercase bg-white/20 backdrop-blur-md">
+                      {project.category}
+                    </span>
+                    <span className="px-2.5 py-1 rounded-xl text-[10px] font-semibold bg-black/30 backdrop-blur-md flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {project.modules.reduce((a, b) => a + b.durationMinutes, 0)} mins
+                    </span>
+                  </div>
+
+                  <h3 className="text-base font-extrabold text-white leading-snug group-hover:underline decoration-white/50">
+                    {project.title}
+                  </h3>
+                </div>
+
+                {/* Card Body */}
+                <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                  <p className="text-xs text-slate-500 line-clamp-3 leading-relaxed">
+                    {project.description}
+                  </p>
+
+                  {/* Hardware BOM Callout */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+                    <div className="flex items-start gap-2">
+                      <Wrench className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
+                      <div className="text-xs min-w-0">
+                        <span className="text-slate-400 text-[10px] uppercase font-bold block">
+                          Included Hardware Kit
+                        </span>
+                        <span className="text-slate-800 font-semibold block leading-tight mt-0.5 truncate">
+                          {project.hardwareKit}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Progress & Milestone Count */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <div className="flex items-center justify-between text-xs font-semibold mb-1.5">
+                      <span className="text-slate-400">Kit Progress</span>
+                      <span className="text-slate-800">{progress.completionPercentage}%</span>
+                    </div>
+
+                    <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          isCompleted ? 'bg-emerald-500' : 'bg-[#0ea5e9]'
+                        }`}
+                        style={{ width: `${progress.completionPercentage}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between mt-2 text-[11px] text-slate-400">
+                      <span>{completedCount} of {totalModules} build stages</span>
+                      {isCompleted && (
+                        <span className="text-emerald-600 font-semibold flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Ready for Exam
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2.5">
+                      <Link
+                        to={`/course/${project.courseId}`}
+                        className="py-2.5 px-3 rounded-xl bg-[#0ea5e9] hover:bg-[#0284c7] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        {progress.completionPercentage > 0 ? 'Resume Lab' : 'Build Kit'}
+                      </Link>
+
+                      <Link
+                        to={`/course/${project.courseId}/exam`}
+                        className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition border ${
+                          isCompleted
+                            ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 shadow-xs'
+                            : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-600'
+                        }`}
+                      >
+                        <Award className="w-3.5 h-3.5 text-amber-500" />
+                        {isCompleted ? 'Take Exam' : 'Exam'}
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 4. WORKBENCH WIRING SAFETY CHECKLIST                      */}
+      {/* ========================================================= */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xs border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="max-w-xl">
+          <div className="flex items-center gap-2 text-xs font-bold text-sky-600 uppercase tracking-wider mb-1">
+            <Cpu className="w-4 h-4" />
+            <span>Hardware Test Bench</span>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-[#0ea5e9]">88.5%</span>
-            <span className="text-xs font-semibold text-slate-400">Score &gt; 80%</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">Certificates issued with S3 pre-signed downloads</p>
+          <h3 className="text-base font-extrabold text-slate-800">
+            Physical Kit Wiring & Safety Standards
+          </h3>
+          <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+            Every project kit uses standard 3.3V logic protection, flyback diode motor isolation, and shared common ground wiring. Inspect the interactive schematics tab in each project before plugging in your LiPo battery.
+          </p>
         </div>
 
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="font-bold text-xs text-slate-800">Content Usage</h4>
-            <span className="text-[10px] text-slate-400">HLS Telemetry</span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-rose-500">1.8 TB</span>
-            <span className="text-xs font-semibold text-slate-400">CloudFront CDN</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">Adaptive video streaming across 1080p and 720p</p>
-        </div>
+        <Link
+          to={`/course/${activeProject.courseId}`}
+          className="py-3 px-5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs inline-flex items-center gap-2 transition shrink-0"
+        >
+          <span>Open Schematics Viewer</span>
+          <ArrowRight className="w-4 h-4" />
+        </Link>
       </div>
     </div>
   );

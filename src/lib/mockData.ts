@@ -1,36 +1,32 @@
-import { Course } from '../types/course';
+import { HardwareProject } from '../types/course';
 import { AuthUser } from '../types/auth';
 
 export const DEMO_USERS: Record<string, AuthUser> = {
   student: {
     userId: 'usr_student_001',
-    email: 'alex.robotics@example.com',
-    name: 'Alex Mercer (Student)',
+    email: 'student@robotics.edu',
+    name: 'Sannath Koushik',
     role: 'student',
-    isMock: true,
-  },
-  admin: {
-    userId: 'usr_admin_001',
-    email: 'prof.elena@example.com',
-    name: 'Dr. Elena Vance (Admin / Instructor)',
-    role: 'admin',
-    isMock: true,
+    isMock: false,
   },
 };
 
-export const SAMPLE_COURSES: Course[] = [
+export const SAMPLE_PROJECTS: HardwareProject[] = [
   {
+    projectId: 'crs-esp32-rover',
     courseId: 'crs-esp32-rover',
-    title: 'Autonomous Rover with ESP32 & ROS2 Micro-XRCE',
-    description: 'Design, wire, and program a 4-wheel differential drive rover equipped with ESP32, dual H-Bridge motor drivers, and ultrasonic obstacle avoidance.',
+    title: 'Project 1: Autonomous Obstacle-Avoiding Rover Kit',
+    description: 'Assemble a differential-drive 4WD robotic rover using the ESP32 microcontroller, L298N dual H-Bridge motor driver, HC-SR04 ultrasonic sonar, and 7.4V LiPo battery pack.',
     level: 'Intermediate',
-    hardwareKit: 'ESP32 Rover Kit Pro v2.4 (L298N, HC-SR04, LiPo 2S)',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=800&q=80',
+    category: 'Autonomous Vehicles',
+    hardwareKit: 'RoboRover Kit v2.4 (ESP32, L298N, TT Motors, Sonar, 2S LiPo)',
+    accentColor: '#0ea5e9',
     modules: [
       {
+        stageId: 'mod-1',
         moduleId: 'mod-1',
-        title: 'Module 1: Chassis Assembly & Dual Motor Driver Wiring',
-        description: 'Mount the DC geared motors, wire the L298N motor driver to ESP32 GPIOs, and establish safe common ground with the LiPo battery.',
+        title: 'Stage 1: Chassis Assembly & Dual Motor Driver Wiring',
+        description: 'Mount the yellow gearbox DC motors, wire the L298N driver to ESP32 PWM pins, and establish a common ground with the LiPo battery.',
         durationMinutes: 24,
         videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
         hardwareChecklist: [
@@ -60,89 +56,117 @@ export const SAMPLE_COURSES: Course[] = [
             id: 'hw-4',
             name: 'Yellow TT Gearbox DC Motors (1:48)',
             quantity: 2,
-            description: 'High torque 3V-6V DC geared motors with rubber wheels.',
+            description: 'High-torque 3V-6V DC geared motors with rubber wheels.',
           },
         ],
         wiringDiagrams: [
           {
             id: 'wd-1',
-            title: 'ESP32 to L298N Schematic',
-            imageUrl: 'https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?auto=format&fit=crop&w=800&q=80',
-            description: 'Connect ESP32 GPIO16 -> IN1, GPIO17 -> IN2, GPIO18 -> IN3, GPIO19 -> IN4. Common Ground tied between ESP32 and LiPo GND.',
-            voltageWarning: 'WARNING: Never connect 7.4V motor voltage directly to ESP32 3.3V or 5V VIN without a voltage regulator!',
+            title: 'ESP32 to L298N Motor Driver Wiring',
+            diagramType: 'l298n-motor',
+            description: 'Connect ESP32 PWM pins to L298N IN1-IN4. LiPo ground MUST be tied together with ESP32 GND for a common reference.',
+            voltageWarning: 'WARNING: Never connect 7.4V battery power directly to ESP32 3.3V or VIN without the 5V regulator!',
+            pinConnections: [
+              { from: 'ESP32 GPIO 16', to: 'L298N IN1 (Motor A Forward)', signalType: 'PWM', color: '#0ea5e9' },
+              { from: 'ESP32 GPIO 17', to: 'L298N IN2 (Motor A Reverse)', signalType: 'GPIO', color: '#38bdf8' },
+              { from: 'ESP32 GPIO 18', to: 'L298N IN3 (Motor B Forward)', signalType: 'PWM', color: '#6366f1' },
+              { from: 'ESP32 GPIO 19', to: 'L298N IN4 (Motor B Reverse)', signalType: 'GPIO', color: '#818cf8' },
+              { from: 'ESP32 GND', to: 'L298N GND (Common Ground)', signalType: 'Ground', color: '#64748b' },
+              { from: 'LiPo 7.4V (+)', to: 'L298N 12V Power Terminal', signalType: 'Power', color: '#f43f5e' },
+              { from: 'LiPo GND (-)', to: 'L298N GND Terminal', signalType: 'Ground', color: '#0f172a' },
+            ],
           },
         ],
         codeSnippets: [
           {
             id: 'snip-1',
-            filename: 'motor_driver_esp32.ino',
+            filename: 'rover_motor_control.ino',
             language: 'arduino',
-            description: 'LED control & Dual PWM initialization with ESP32 ledc library.',
-            code: `// Motor Driver ESP32 PWM Control
+            description: 'ESP32 hardware LEDC PWM initialization and differential steering routines.',
+            code: `// ESP32 Rover Motor Driver PWM Control
 #define PIN_IN1 16
 #define PIN_IN2 17
 #define PIN_IN3 18
 #define PIN_IN4 19
 
-const int freq = 20000;
-const int pwmChannelA = 0;
-const int pwmChannelB = 1;
-const int resolution = 8; // 0-255 duty cycle
+const int pwmFreq = 20000;
+const int pwmResolution = 8; // 0-255 duty cycle
+const int channelA = 0;
+const int channelB = 1;
 
 void setup() {
   Serial.begin(115200);
-  ledcAttachChannel(PIN_IN1, freq, resolution, pwmChannelA);
-  ledcAttachChannel(PIN_IN3, freq, resolution, pwmChannelB);
+  
+  // Attach LEDC PWM channels to ESP32 pins
+  ledcAttachChannel(PIN_IN1, pwmFreq, pwmResolution, channelA);
+  ledcAttachChannel(PIN_IN3, pwmFreq, pwmResolution, channelB);
+  
   pinMode(PIN_IN2, OUTPUT);
   pinMode(PIN_IN4, OUTPUT);
 
-  // Set initial Forward motion
+  // Initial Drive Forward at 75% speed
   digitalWrite(PIN_IN2, LOW);
-  ledcWriteChannel(pwmChannelA, 200); // 78% duty cycle
+  ledcWriteChannel(channelA, 190);
   
   digitalWrite(PIN_IN4, LOW);
-  ledcWriteChannel(pwmChannelB, 200);
-  Serial.println("Rover Motors Initialized!");
+  ledcWriteChannel(channelB, 190);
+  
+  Serial.println("RoboRover: Motors Initialized and Running!");
 }
 
 void loop() {
-  // Motor control loop runs in Phase 2
+  // Navigation loop handled in Stage 2
 }
 `,
           },
         ],
       },
       {
+        stageId: 'mod-2',
         moduleId: 'mod-2',
-        title: 'Module 2: Ultrasonic Sensor Calibration & Range Filtering',
-        description: 'Mount HC-SR04 sonar sensor on a pan-tilt servo bracket and implement a median filter to reject acoustic echo spikes.',
+        title: 'Stage 2: Ultrasonic Sonar Sensor Calibration & Obstacle Avoidance',
+        description: 'Mount the HC-SR04 sonar sensor on a pan-tilt bracket, wire the 5V-to-3.3V voltage divider on the Echo line, and implement acoustic spike rejection.',
         durationMinutes: 18,
         videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
         hardwareChecklist: [
           {
             id: 'hw-5',
-            name: 'HC-SR04 Ultrasonic Sensor (or RCWL-9610 3.3V version)',
+            name: 'HC-SR04 Ultrasonic Sensor',
             quantity: 1,
-            description: 'Non-contact sonar ranging module from 2cm to 400cm.',
-            pinoutNotes: 'VCC 5V, Trig to GPIO 5, Echo with 1k/2k voltage divider to GPIO 18.',
+            description: 'Sonar ranging sensor measuring distances from 2cm to 400cm.',
+            pinoutNotes: 'VCC 5V, Trig to GPIO 5, Echo through 1k/2k voltage divider to GPIO 4.',
+          },
+          {
+            id: 'hw-6',
+            name: 'Resistors (1k Ohm & 2k Ohm)',
+            quantity: 2,
+            description: 'Voltage divider stepping 5V down to 3.3V logic for ESP32 safety.',
           },
         ],
         wiringDiagrams: [
           {
             id: 'wd-2',
-            title: 'Sonar Sensor Voltage Divider Circuit',
-            imageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
-            description: '5V Echo output stepped down to 3.3V safe logic for ESP32 inputs.',
-            voltageWarning: 'ESP32 GPIO pins are NOT 5V tolerant. Exceeding 3.6V will damage the SoC.',
+            title: 'Sonar Sensor Voltage Divider Protection',
+            diagramType: 'ultrasonic-divider',
+            description: '5V Echo output stepped down through a 1k / 2k resistor divider to safeguard ESP32 3.3V inputs.',
+            voltageWarning: 'ESP32 GPIO pins are strictly 3.3V logic! Exceeding 3.6V will permanently damage the silicon.',
+            pinConnections: [
+              { from: 'ESP32 5V VIN', to: 'HC-SR04 VCC', signalType: 'Power', color: '#f43f5e' },
+              { from: 'ESP32 GPIO 5', to: 'HC-SR04 Trig', signalType: 'GPIO', color: '#0ea5e9' },
+              { from: 'HC-SR04 Echo (5V)', to: '1k Resistor Input', signalType: 'Analog', color: '#f59e0b' },
+              { from: 'Divider Node (3.3V)', to: 'ESP32 GPIO 4', signalType: 'GPIO', color: '#2bb398' },
+              { from: '2k Resistor Leg', to: 'ESP32 GND', signalType: 'Ground', color: '#64748b' },
+            ],
           },
         ],
         codeSnippets: [
           {
             id: 'snip-2',
-            filename: 'sonar_filter.py',
+            filename: 'sonar_avoidance.py',
             language: 'python',
-            description: 'Median filter implementation for distance smoothing.',
+            description: 'Median filter implementation for acoustic distance spike filtering.',
             code: `import statistics
+import time
 
 class SonarSensor:
     def __init__(self, window_size=5):
@@ -160,6 +184,11 @@ class SonarSensor:
         if not self.buffer:
             return -1.0
         return statistics.median(self.buffer)
+
+# Test run
+sensor = SonarSensor()
+for sample in [25.4, 26.1, 999.0, 25.8, 25.5]:
+    print("Filtered Distance (cm):", sensor.add_reading(sample))
 `,
           },
         ],
@@ -167,24 +196,129 @@ class SonarSensor:
     ],
   },
   {
+    projectId: 'crs-robotic-arm-kinematics',
     courseId: 'crs-robotic-arm-kinematics',
-    title: '6-DOF Robotic Arm Kinematics & Servo Bus Control',
-    description: 'Master forward and inverse kinematics using Denavit-Hartenberg (DH) parameters, wiring high-torque serial bus servos, and trajectory planning.',
+    title: 'Project 2: 6-DOF Robotic Arm & Inverse Kinematics Kit',
+    description: 'Construct a 6-axis articulated robotic arm using STS3215 high-torque serial bus servos. Implement forward and inverse kinematics using Denavit-Hartenberg matrices.',
     level: 'Advanced',
-    hardwareKit: 'STS3215 Serial Bus Servos + Aluminium 6-DOF Robotic Arm Frame',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
+    category: 'Kinematics',
+    hardwareKit: 'RoboArm Pro Kit (STS3215 Serial Bus Servos + Aluminium 6-Axis Frame)',
+    accentColor: '#8b5cf6',
     modules: [
       {
+        stageId: 'mod-arm-1',
         moduleId: 'mod-arm-1',
-        title: 'Module 1: UART Bus Protocol & Servo ID Assignment',
-        description: 'Configure half-duplex UART communication, assign individual hex IDs, and calibrate zero positions.',
+        title: 'Stage 1: UART Bus Protocol & Servo ID Assignment',
+        description: 'Configure half-duplex UART serial communication, assign unique IDs to each servo, and zero out home positions.',
         durationMinutes: 30,
         videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-        hardwareChecklist: [],
-        wiringDiagrams: [],
+        hardwareChecklist: [
+          {
+            id: 'hw-arm-1',
+            name: 'STS3215 Magnetic Encoder Serial Servos (30kg-cm)',
+            quantity: 6,
+            description: 'High-precision metal gear serial bus servos with position/torque feedback.',
+            pinoutNotes: 'Half-duplex TTL single-wire UART at 1 Mbps.',
+          },
+          {
+            id: 'hw-arm-2',
+            name: '12V 5A DC Power Supply',
+            quantity: 1,
+            description: 'Dedicated high-current servo power rail.',
+          },
+        ],
+        wiringDiagrams: [
+          {
+            id: 'wd-arm-1',
+            title: 'Half-Duplex Serial Servo Daisy Chain',
+            diagramType: 'servo-bus',
+            description: 'Daisy-chain data signals across all 6 servos with common ground to the microcontroller.',
+            voltageWarning: 'Ensure 12V servo bus does not back-feed into the 3.3V logic pin of the MCU.',
+            pinConnections: [
+              { from: 'MCU TX/RX (Half-Duplex)', to: 'Servo 1 Data Pin', signalType: 'Serial', color: '#8b5cf6' },
+              { from: '12V Power Supply (+)', to: 'Servo Bus 12V Rail', signalType: 'Power', color: '#f43f5e' },
+              { from: '12V Power Supply (-)', to: 'MCU GND & Servo GND', signalType: 'Ground', color: '#64748b' },
+            ],
+          },
+        ],
+        codeSnippets: [
+          {
+            id: 'snip-arm-1',
+            filename: 'servo_bus_controller.cpp',
+            language: 'cpp',
+            description: 'Packet generation for STS3215 position read and write.',
+            code: `#include <Arduino.h>
+
+void setServoPosition(uint8_t id, uint16_t position, uint16_t timeMs) {
+  uint8_t packet[10];
+  packet[0] = 0xFF;
+  packet[1] = 0xFF;
+  packet[2] = id;
+  packet[3] = 7; // Length
+  packet[4] = 0x03; // Write instruction
+  packet[5] = 0x2A; // Position register
+  packet[6] = (position >> 8) & 0xFF;
+  packet[7] = position & 0xFF;
+  packet[8] = (timeMs >> 8) & 0xFF;
+  packet[9] = timeMs & 0xFF;
+  
+  Serial1.write(packet, sizeof(packet));
+}
+`,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    projectId: 'crs-iot-greenhouse',
+    courseId: 'crs-iot-greenhouse',
+    title: 'Project 3: IoT Smart Greenhouse & Irrigation Kit',
+    description: 'Wire capacitive soil moisture sensors, a 5V optocoupled relay, and submersible water pump. Publish telemetry to AWS IoT Core over MQTT.',
+    level: 'Beginner',
+    category: 'IoT & Cloud',
+    hardwareKit: 'AgriBot Kit (ESP32, Capacitive Sensor, 5V Relay, Mini Water Pump)',
+    accentColor: '#2bb398',
+    modules: [
+      {
+        stageId: 'mod-gh-1',
+        moduleId: 'mod-gh-1',
+        title: 'Stage 1: Capacitive Moisture Sensing & Pump Relay Control',
+        description: 'Read analog soil capacitance, calibrate dry vs wet soil thresholds, and pulse the relay safely.',
+        durationMinutes: 20,
+        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+        hardwareChecklist: [
+          {
+            id: 'hw-gh-1',
+            name: 'Capacitive Soil Moisture Sensor v1.2',
+            quantity: 1,
+            description: 'Corrosion-resistant analog capacitance sensor.',
+          },
+          {
+            id: 'hw-gh-2',
+            name: '1-Channel 5V Optocoupled Relay Module',
+            quantity: 1,
+            description: 'Isolates pump inductive flyback from microcontroller logic.',
+          },
+        ],
+        wiringDiagrams: [
+          {
+            id: 'wd-gh-1',
+            title: 'Optocoupled Relay & Flyback Diode Circuit',
+            diagramType: 'relay-pump',
+            description: 'Optocoupled relay isolation protecting MCU GPIO from pump coil spikes.',
+            voltageWarning: 'Ensure flyback diode 1N4007 is across the DC pump motor terminals to clamp back-EMF.',
+            pinConnections: [
+              { from: 'ESP32 GPIO 25', to: 'Relay IN Pin', signalType: 'GPIO', color: '#2bb398' },
+              { from: 'ESP32 3.3V', to: 'Moisture Sensor VCC', signalType: 'Power', color: '#f43f5e' },
+              { from: 'Moisture Sensor AOUT', to: 'ESP32 ADC1_CH0 (GPIO 36)', signalType: 'Analog', color: '#0ea5e9' },
+            ],
+          },
+        ],
         codeSnippets: [],
       },
     ],
   },
 ];
 
+export const SAMPLE_COURSES = SAMPLE_PROJECTS; // Backward compatibility
