@@ -1,0 +1,243 @@
+{
+  "Settings": {
+    "TimecodeConfig": {
+      "Source": "ZEROBASED"
+    },
+    "OutputGroups": [
+      {
+        "Name": "HLS Adaptive Bitrate Group",
+        "OutputGroupSettings": {
+          "Type": "HLS_GROUP_SETTINGS",
+          "HlsGroupSettings": {
+            "SegmentLength": 6,
+            "MinSegmentLength": 0,
+            "Destination": "s3://YOUR_DESTINATION_BUCKET_NAME/hls/esp32-chassis-assembly/",
+            "DirectoryStructure": "SINGLE_DIRECTORY",
+            "ManifestDurationFormat": "INTEGER",
+            "SegmentControl": "SEGMENTED_FILES",
+            "TimedMetadataId3Period": 10,
+            "CaptionLanguageSetting": "OMIT",
+            "ClientCache": "ENABLED",
+            "CodecSpecification": "RFC_4281",
+            "OutputSelection": "MANIFESTS_AND_SEGMENTS",
+            "StreamInfResolution": "INCLUDE"
+          }
+        },
+        "Outputs": [
+          {
+            "NameModifier": "_1080p",
+            "ContainerSettings": {
+              "Container": "M3U8",
+              "M3u8Settings": {
+                "AudioFramesPerPes": 4,
+                "PcrControl": "PCR_EVERY_PES_PACKET",
+                "PmtPid": 480,
+                "PrivateMetadataPid": 503,
+                "ProgramNumber": 1,
+                "PatInterval": 0,
+                "PmtInterval": 0,
+                "VideoPid": 481,
+                "AudioPids": [482]
+              }
+            },
+            "VideoDescription": {
+              "Width": 1920,
+              "Height": 1080,
+              "ScalingBehavior": "DEFAULT",
+              "Sharpness": 50,
+              "AntiAlias": "ENABLED",
+              "TimecodeInsertion": "DISABLED",
+              "ColorMetadata": "INSERT",
+              "RespondToAfd": "NONE",
+              "AfdSignaling": "NONE",
+              "DropFrameTimecode": "ENABLED",
+              "CodecSettings": {
+                "Codec": "H_264",
+                "H264Settings": {
+                  "InterlaceMode": "PROGRESSIVE",
+                  "NumberReferenceFrames": 3,
+                  "Syntax": "DEFAULT",
+                  "Softness": 0,
+                  "GopClosedCadence": 1,
+                  "GopSize": 120,
+                  "GopSizeUnits": "FRAMES",
+                  "Slices": 1,
+                  "GopBReference": "DISABLED",
+                  "SlowPal": "DISABLED",
+                  "SpatialAdaptiveQuantization": "ENABLED",
+                  "TemporalAdaptiveQuantization": "ENABLED",
+                  "FlickerAdaptiveQuantization": "DISABLED",
+                  "EntropyEncoding": "CABAC",
+                  "Bitrate": 5000000,
+                  "FramerateControl": "INITIALIZE_FROM_SOURCE",
+                  "RateControlMode": "CBR",
+                  "CodecProfile": "HIGH",
+                  "Telecine": "NONE",
+                  "MinIInterval": 0,
+                  "AdaptiveQuantization": "HIGH",
+                  "CodecLevel": "LEVEL_4_1",
+                  "FieldEncoding": "PAFF",
+                  "SceneChangeDetect": "ENABLED",
+                  "QualityTuningLevel": "MULTI_PASS_HQ",
+                  "ParControl": "INITIALIZE_FROM_SOURCE"
+                }
+              }
+            },
+            "AudioDescriptions": [
+              {
+                "AudioTypeControl": "FOLLOW_INPUT",
+                "AudioSourceName": "Audio Selector 1",
+                "CodecSettings": {
+                  "Codec": "AAC",
+                  "AacSettings": {
+                    "AudioDescriptionBroadcasterMix": "NORMAL",
+                    "Bitrate": 128000,
+                    "RateControlMode": "CBR",
+                    "CodecProfile": "LC",
+                    "CodingMode": "CODING_MODE_2_0",
+                    "RawFormat": "NONE",
+                    "SampleRate": 48000,
+                    "Specification": "MPEG4"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "NameModifier": "_720p",
+            "ContainerSettings": {
+              "Container": "M3U8",
+              "M3u8Settings": {
+                "AudioFramesPerPes": 4,
+                "PcrControl": "PCR_EVERY_PES_PACKET",
+                "PmtPid": 480,
+                "PrivateMetadataPid": 503,
+                "ProgramNumber": 1,
+                "PatInterval": 0,
+                "PmtInterval": 0,
+                "VideoPid": 481,
+                "AudioPids": [482]
+              }
+            },
+            "VideoDescription": {
+              "Width": 1280,
+              "Height": 720,
+              "ScalingBehavior": "DEFAULT",
+              "Sharpness": 50,
+              "AntiAlias": "ENABLED",
+              "CodecSettings": {
+                "Codec": "H_264",
+                "H264Settings": {
+                  "InterlaceMode": "PROGRESSIVE",
+                  "NumberReferenceFrames": 3,
+                  "GopClosedCadence": 1,
+                  "GopSize": 120,
+                  "GopSizeUnits": "FRAMES",
+                  "Bitrate": 3000000,
+                  "FramerateControl": "INITIALIZE_FROM_SOURCE",
+                  "RateControlMode": "CBR",
+                  "CodecProfile": "MAIN",
+                  "CodecLevel": "LEVEL_3_1",
+                  "AdaptiveQuantization": "HIGH",
+                  "SceneChangeDetect": "ENABLED",
+                  "QualityTuningLevel": "MULTI_PASS_HQ"
+                }
+              }
+            },
+            "AudioDescriptions": [
+              {
+                "AudioTypeControl": "FOLLOW_INPUT",
+                "AudioSourceName": "Audio Selector 1",
+                "CodecSettings": {
+                  "Codec": "AAC",
+                  "AacSettings": {
+                    "Bitrate": 128000,
+                    "RateControlMode": "CBR",
+                    "CodecProfile": "LC",
+                    "CodingMode": "CODING_MODE_2_0",
+                    "SampleRate": 48000
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "NameModifier": "_480p",
+            "ContainerSettings": {
+              "Container": "M3U8",
+              "M3u8Settings": {
+                "AudioFramesPerPes": 4,
+                "PcrControl": "PCR_EVERY_PES_PACKET",
+                "PmtPid": 480,
+                "PrivateMetadataPid": 503,
+                "ProgramNumber": 1,
+                "VideoPid": 481,
+                "AudioPids": [482]
+              }
+            },
+            "VideoDescription": {
+              "Width": 854,
+              "Height": 480,
+              "ScalingBehavior": "DEFAULT",
+              "Sharpness": 50,
+              "CodecSettings": {
+                "Codec": "H_264",
+                "H264Settings": {
+                  "InterlaceMode": "PROGRESSIVE",
+                  "NumberReferenceFrames": 3,
+                  "GopClosedCadence": 1,
+                  "GopSize": 120,
+                  "GopSizeUnits": "FRAMES",
+                  "Bitrate": 1500000,
+                  "FramerateControl": "INITIALIZE_FROM_SOURCE",
+                  "RateControlMode": "CBR",
+                  "CodecProfile": "MAIN",
+                  "CodecLevel": "LEVEL_3_1",
+                  "AdaptiveQuantization": "HIGH",
+                  "SceneChangeDetect": "ENABLED"
+                }
+              }
+            },
+            "AudioDescriptions": [
+              {
+                "AudioTypeControl": "FOLLOW_INPUT",
+                "AudioSourceName": "Audio Selector 1",
+                "CodecSettings": {
+                  "Codec": "AAC",
+                  "AacSettings": {
+                    "Bitrate": 96000,
+                    "RateControlMode": "CBR",
+                    "CodecProfile": "LC",
+                    "CodingMode": "CODING_MODE_2_0",
+                    "SampleRate": 48000
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "Inputs": [
+      {
+        "AudioSelectors": {
+          "Audio Selector 1": {
+            "DefaultSelection": "DEFAULT"
+          }
+        },
+        "VideoSelector": {
+          "ColorSpace": "FOLLOW",
+          "Rotate": "AUTO"
+        },
+        "FilterEnable": "AUTO",
+        "PsiControl": "USE_PSI",
+        "FilterStrength": 0,
+        "DeblockFilter": "DISABLED",
+        "DenoiseFilter": "DISABLED",
+        "TimecodeSource": "ZEROBASED",
+        "FileInput": "s3://YOUR_SOURCE_BUCKET_NAME/uploads/esp32-chassis-assembly.mp4"
+      }
+    ]
+  }
+}
+

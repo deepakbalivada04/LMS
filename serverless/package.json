@@ -1,0 +1,23 @@
+{
+  "name": "robolms-serverless-backend",
+  "version": "1.0.0",
+  "description": "Serverless backend Lambda functions for RoboLMS",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.750.0",
+    "@aws-sdk/client-mediaconvert": "^3.1161.0",
+    "@aws-sdk/client-s3": "^3.1161.0",
+    "@aws-sdk/lib-dynamodb": "^3.750.0",
+    "@aws-sdk/s3-request-presigner": "^3.1161.0",
+    "pdfkit": "^0.20.2"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.147",
+    "@types/node": "^22.13.0",
+    "@types/pdfkit": "^0.17.7",
+    "typescript": "^5.7.0"
+  }
+}

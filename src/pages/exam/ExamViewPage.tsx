@@ -1,0 +1,33 @@
+import React from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { SAMPLE_COURSES } from '../../lib/mockData';
+import { ExamEngine } from '../../components/exam/ExamEngine';
+import { ArrowLeft, AlertCircle } from 'lucide-react';
+
+export const ExamViewPage: React.FC = () => {
+  const { courseId } = useParams<{ courseId: string }>();
+  const course = SAMPLE_COURSES.find((c) => c.courseId === courseId) || SAMPLE_COURSES[0];
+
+  if (!course) {
+    return (
+      <div className="max-w-md mx-auto text-center py-16">
+        <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-500 border border-amber-200 flex items-center justify-center mx-auto mb-4">
+          <AlertCircle className="w-7 h-7" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-800 mb-2">Track Not Found</h2>
+        <p className="text-xs text-slate-400 mb-6">
+          The requested course track was not found in the certification catalog.
+        </p>
+        <Link
+          to="/dashboard"
+          className="px-4 py-2 rounded-xl bg-sky-500 text-white font-bold text-xs inline-flex items-center gap-2"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Dashboard
+        </Link>
+      </div>
+    );
+  }
+
+  return <ExamEngine course={course} />;
+};

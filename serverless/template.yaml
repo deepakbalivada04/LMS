@@ -1,0 +1,178 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: RoboLMS Serverless Backend - Progress Tracking, DynamoDB, PDF Exam Engine & S3 Certificates
+
+Parameters:
+  CognitoUserPoolArn:
+    Type: String
+    Description: ARN of the Cognito User Pool for API authorization
+    Default: ''
+
+Globals:
+  Function:
+    Timeout: 15
+    MemorySize: 512
+    Runtime: nodejs20.x
+    Architectures:
+      - arm64
+    Environment:
+      Variables:
+        PROGRESS_TABLE_NAME: !Ref ProgressTable
+        COURSES_TABLE_NAME: !Ref CoursesTable
+        USERS_TABLE_NAME: !Ref UsersTable
+        CERTIFICATES_BUCKET_NAME: !Ref CertificatesBucket
+
+Resources:
+  # ========================================================
+  # S3 PRIVATE BUCKET FOR PDF CERTIFICATES
+  # ========================================================
+  CertificatesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - '*'
+            AllowedMethods:
+              - GET
+              - PUT
+              - HEAD
+            AllowedOrigins:
+              - '*'
+            MaxAge: 3600
+
+  # ========================================================
+  # DYNAMODB TABLES
+  # ========================================================
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: RoboLMS-Users
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+
+  CoursesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: RoboLMS-Courses
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: courseId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: courseId
+          KeyType: HASH
+
+  ProgressTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: RoboLMS-Progress
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: courseId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: courseId
+          KeyType: RANGE
+
+  # ========================================================
+  # HTTP API GATEWAY WITH CORS & COGNITO JWT AUTHORIZER
+  # ========================================================
+  RoboLMSHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+          - X-Amz-Date
+        AllowOrigins:
+          - '*'
+
+  # ========================================================
+  # LAMBDA FUNCTIONS
+  # ========================================================
+  UpdateProgressFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: dist/lambda/updateProgress.handler
+      CodeUri: ./
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ProgressTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref CoursesTable
+      Events:
+        PostProgress:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref RoboLMSHttpApi
+            Path: /progress
+            Method: POST
+
+  GetProgressFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: dist/lambda/getProgress.handler
+      CodeUri: ./
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ProgressTable
+      Events:
+        GetProgress:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref RoboLMSHttpApi
+            Path: /progress
+            Method: GET
+
+  SubmitExamFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: dist/lambda/submitExam.handler
+      CodeUri: ./
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ProgressTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref UsersTable
+        - S3CrudPolicy:
+            BucketName: !Ref CertificatesBucket
+      Events:
+        PostExam:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref RoboLMSHttpApi
+            Path: /exam/submit
+            Method: POST
+
+Outputs:
+  ApiGatewayEndpoint:
+    Description: HTTP API Gateway base endpoint URL for frontend .env (VITE_API_GATEWAY_URL)
+    Value: !Sub "https://${RoboLMSHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  CertificatesBucketName:
+    Description: S3 Bucket Name for PDF Certificates
+    Value: !Ref CertificatesBucket
