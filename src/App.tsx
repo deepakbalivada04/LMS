@@ -6,6 +6,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { Layout } from './components/layout/Layout';
 import { LoginPage } from './pages/auth/LoginPage';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
+import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { CourseViewPage } from './pages/course/CourseViewPage';
 import { ExamViewPage } from './pages/exam/ExamViewPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -29,6 +30,18 @@ export const App: React.FC = () => {
                 <ProtectedRoute>
                   <Layout>
                     <DashboardPage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Dedicated Admin Console Route */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <Layout>
+                    <AdminDashboard />
                   </Layout>
                 </ProtectedRoute>
               }

@@ -1,0 +1,44 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudWatchLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:*:*:*"
+    },
+    {
+      "Sid": "MediaConvertControl",
+      "Effect": "Allow",
+      "Action": [
+        "mediaconvert:DescribeEndpoints",
+        "mediaconvert:CreateJob",
+        "mediaconvert:GetJob"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "PassRoleToMediaConvert",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::*:role/MediaConvert_Default_Role"
+    },
+    {
+      "Sid": "ReadSourceS3Bucket",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::robotics-lms-videos-2026",
+        "arn:aws:s3:::robotics-lms-videos-2026/*"
+      ]
+    }
+  ]
+}
+

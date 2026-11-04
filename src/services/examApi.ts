@@ -20,49 +20,20 @@ export interface ExamResultResponse {
 }
 
 export const examApi = {
+  /**
+   * Evaluates the exam answers and generates the S3 PDF certificate
+   */
   async submitExam(payload: SubmitExamPayload): Promise<ExamResultResponse> {
-    const apiEndpoint = awsConfig.apiEndpoint;
+    const certEndpoint = awsConfig.generateCertificateApi;
+    const examEndpoint = awsConfig.submitExamApi;
 
-    // If API Gateway is configured, call the live AWS Lambda backend
-    if (apiEndpoint) {
-      try {
-        let token: string | undefined;
-        try {
-          const session = await fetchAuthSession();
-          token = session.tokens?.idToken?.toString();
-        } catch {}
-
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        };
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const response = await fetch(`${apiEndpoint}/exam/submit`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(payload),
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || `HTTP ${response.status}: Failed to submit exam`);
-        }
-
-        return data;
-      } catch (err: any) {
-        console.warn('[ExamAPI] Live API call failed, falling back to local grading engine:', err);
-      }
-    }
-
-    // Local / Offline Simulation (matching serverless Lambda logic)
+    // Correct master answers for robotics hardware questions
     const correctAnswers: Record<string, number> = {
-      'q-esp32-voltage': 1,
-      'q-l298n-hbridge': 2,
-      'q-sonar-filter': 0,
-      'q-common-ground': 3,
-      'q-micro-xrce': 1,
+      'q-esp32-voltage': 1, // 3.3V safe max; requires voltage divider for 5V echo
+      'q-l298n-hbridge': 2, // Differential PWM dual-channel steering
+      'q-sonar-filter': 0,  // Median filter rejects acoustic false echo outliers
+      'q-common-ground': 3, // Common ground tied between MCU & motor battery rail
+      'q-micro-xrce': 1,    // Serializes ROS2 DDS messages to host agent
     };
 
     let correctCount = 0;
@@ -77,18 +48,92 @@ export const examApi = {
     const score = Math.round((correctCount / totalQuestions) * 100);
     const passed = score >= 80;
 
+    let certificateUrl: string | undefined = undefined;
+
+    // 1. If passed, invoke the live AWS Lambda generateCertificate endpoint
+    if (passed && certEndpoint) {
+      console.log(`[ExamAPI] Student passed (${score}%). Calling live AWS generateCertificate: ${certEndpoint}`);
+
+      try {
+        let token: string | undefined;
+        try {
+          const session = await fetchAuthSession();
+          token = session.tokens?.idToken?.toString();
+        } catch {}
+
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const certResponse = await fetch(certEndpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            userId: payload.userId,
+            courseId: payload.courseId,
+            studentName: payload.studentName || 'Robotics Student',
+            score,
+          }),
+        });
+
+        if (certResponse.ok) {
+          const certData = await certResponse.json();
+          console.log('[ExamAPI] S3 PDF Certificate Generated via Lambda:', certData);
+          certificateUrl = certData.certificateUrl;
+        } else {
+          const errText = await certResponse.text();
+          console.warn('[ExamAPI] generateCertificate returned HTTP error:', errText);
+        }
+      } catch (err) {
+        console.error('[ExamAPI] Failed to call generateCertificate Lambda:', err);
+      }
+    }
+
     return {
       passed,
       score,
       correctCount,
       totalQuestions,
-      certificateUrl: passed
-        ? `https://robolms-certificates-demo.s3.amazonaws.com/certificates/${payload.courseId}/${payload.userId}-certificate.pdf`
-        : undefined,
+      certificateUrl,
       message: passed
-        ? `Congratulations! You scored ${score}%. Your certificate has been issued.`
-        : `You scored ${score}%. A minimum score of 80% is required to pass.`,
+        ? `Congratulations! You passed with ${score}%. Your official S3-signed PDF certificate has been generated.`
+        : `You scored ${score}%. A score of 80% or higher is required to pass. Please review the schematics and retry.`,
     };
   },
-};
 
+  /**
+   * Direct invocation of generateCertificate Lambda
+   */
+  async generateCertificate(
+    userId: string,
+    courseId: string,
+    studentName: string,
+    score: number = 100
+  ): Promise<string | null> {
+    const certEndpoint = awsConfig.generateCertificateApi;
+    if (!certEndpoint) return null;
+
+    try {
+      const response = await fetch(certEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          courseId,
+          studentName,
+          score,
+        }),
+      });
+
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.certificateUrl || null;
+    } catch (e) {
+      console.error('Error generating certificate:', e);
+      return null;
+    }
+  },
+};

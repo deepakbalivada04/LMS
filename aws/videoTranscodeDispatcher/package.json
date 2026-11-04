@@ -1,0 +1,11 @@
+{
+  "name": "video-transcode-dispatcher",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "AWS Lambda dispatcher for automated S3-triggered MediaConvert HLS transcoding",
+  "main": "index.mjs",
+  "dependencies": {
+    "@aws-sdk/client-mediaconvert": "^3.750.0"
+  }
+}
+

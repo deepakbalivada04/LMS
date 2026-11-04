@@ -11,7 +11,7 @@ import {
 } from 'aws-amplify/auth';
 import { awsConfig } from '../aws-exports';
 import { AuthUser, UserRole, SignUpData } from '../types/auth';
-import { DEMO_USERS } from '../lib/mockData';
+import { userService } from '../services/userService';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -19,26 +19,43 @@ interface AuthContextType {
   isLoading: boolean;
   isMockMode: boolean;
   role: UserRole;
+  isAdmin: boolean;
+  adminViewMode: 'admin' | 'student';
+  toggleAdminViewMode: () => void;
   login: (email: string, password: string) => Promise<AuthUser>;
   register: (data: SignUpData) => Promise<{ isSignUpComplete: boolean; userId?: string }>;
   confirmRegistration: (email: string, code: string) => Promise<boolean>;
   resendCode: (email: string) => Promise<void>;
   logout: () => Promise<void>;
-  switchMockRole: (role: UserRole) => void;
+  refreshUser: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_KEY = 'robolms_mock_user';
+const ADMIN_EMAIL = awsConfig.adminEmail.toLowerCase();
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [adminViewMode, setAdminViewMode] = useState<'admin' | 'student'>('admin');
   const isMockMode = !awsConfig.isConfigured;
 
-  // Extract role from Cognito groups or custom:role attribute
-  const resolveRoleFromCognito = (attributes: Record<string, string | undefined>, session: any): UserRole => {
-    if (attributes['custom:role']) {
+  // Resolve user role: Super Admin check -> User Registry check -> Cognito attributes
+  const resolveRole = (email: string, attributes?: Record<string, string | undefined>, session?: any): UserRole => {
+    const cleanEmail = email.toLowerCase().trim();
+    if (cleanEmail === ADMIN_EMAIL) {
+      return 'admin';
+    }
+
+    // Check persistent user registry (where admin manages approvals)
+    const registered = userService.getUserByEmail(cleanEmail);
+    if (registered) {
+      return registered.role;
+    }
+
+    // Check Cognito custom attributes or groups
+    if (attributes?.['custom:role']) {
       const customRole = attributes['custom:role'].toLowerCase();
       if (customRole === 'admin' || customRole === 'teacher' || customRole === 'student') {
         return customRole as UserRole;
@@ -52,79 +69,122 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (groups.includes('Student') || groups.includes('student')) return 'student';
     }
 
-    return 'student';
+    // All self-registered users default to guest preview pending approval
+    return 'guest';
+  };
+
+  const loadUserData = async () => {
+    setIsLoading(true);
+    if (!awsConfig.isConfigured) {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          const role = resolveRole(parsed.email);
+          setUser({ ...parsed, role });
+        } catch {
+          setUser(null);
+        }
+      } else {
+        // Default to admin for convenient local testing if configured
+        const adminRec = userService.getUserByEmail(ADMIN_EMAIL);
+        if (adminRec) {
+          setUser({
+            userId: adminRec.userId,
+            email: adminRec.email,
+            name: adminRec.name,
+            role: 'admin',
+            status: 'approved',
+            enrolledProjectIds: adminRec.enrolledProjectIds,
+            isMock: true,
+          });
+        }
+      }
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const currentUser = await getCurrentUser();
+      const attributes = await fetchUserAttributes();
+      const session = await fetchAuthSession();
+      const userEmail = (attributes.email || currentUser.username || '').toLowerCase();
+      const role = resolveRole(userEmail, attributes as Record<string, string | undefined>, session);
+
+      // Keep registry synchronized
+      const regRecord = userService.registerOrUpdateUser({
+        email: userEmail,
+        name: attributes.name || attributes.email || 'Robotics Member',
+        userId: currentUser.userId,
+      });
+
+      setUser({
+        userId: currentUser.userId,
+        email: userEmail,
+        name: attributes.name || regRecord.name || userEmail,
+        role: regRecord.role || role,
+        status: regRecord.status,
+        enrolledProjectIds: regRecord.enrolledProjectIds,
+        isMock: false,
+      });
+    } catch (err) {
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
-    const initAuth = async () => {
-      setIsLoading(true);
-      if (!awsConfig.isConfigured) {
-        const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (saved) {
-          try {
-            setUser(JSON.parse(saved));
-          } catch {
-            setUser(DEMO_USERS.student);
-          }
-        } else {
-          setUser(DEMO_USERS.student);
-        }
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const currentUser = await getCurrentUser();
-        const attributes = await fetchUserAttributes();
-        const session = await fetchAuthSession();
-        const role = resolveRoleFromCognito(attributes as Record<string, string | undefined>, session);
-
-        setUser({
-          userId: currentUser.userId,
-          email: attributes.email || currentUser.username,
-          name: attributes.name || attributes.email || 'Robotics Student',
-          role,
-          isMock: false,
-        });
-      } catch (err) {
-        setUser(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initAuth();
+    loadUserData();
   }, []);
 
   const login = async (email: string, password: string): Promise<AuthUser> => {
     setIsLoading(true);
+    const cleanEmail = email.toLowerCase().trim();
+
     try {
       if (!awsConfig.isConfigured) {
-        const role: UserRole = email.includes('admin') ? 'admin' : 'student';
-        const mockUser: AuthUser = {
-          userId: `usr_${Date.now()}`,
-          email,
-          name: email.split('@')[0].toUpperCase(),
-          role,
+        const isSuperAdmin = cleanEmail === ADMIN_EMAIL;
+        const regRecord = userService.registerOrUpdateUser({
+          email: cleanEmail,
+          name: cleanEmail.split('@')[0].toUpperCase(),
+        });
+
+        const authUser: AuthUser = {
+          userId: regRecord.userId,
+          email: cleanEmail,
+          name: regRecord.name,
+          role: isSuperAdmin ? 'admin' : regRecord.role,
+          status: regRecord.status,
+          enrolledProjectIds: regRecord.enrolledProjectIds,
           isMock: true,
         };
-        setUser(mockUser);
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mockUser));
-        return mockUser;
+        setUser(authUser);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(authUser));
+        return authUser;
       }
 
-      const signInResult = await amplifySignIn({ username: email, password });
+      const signInResult = await amplifySignIn({ username: cleanEmail, password });
       if (signInResult.isSignedIn) {
         const currentUser = await getCurrentUser();
         const attributes = await fetchUserAttributes();
         const session = await fetchAuthSession();
-        const role = resolveRoleFromCognito(attributes as Record<string, string | undefined>, session);
+        const role = resolveRole(cleanEmail, attributes as Record<string, string | undefined>, session);
+
+        // Record in registry
+        const regRecord = userService.registerOrUpdateUser({
+          email: cleanEmail,
+          name: attributes.name || cleanEmail,
+          userId: currentUser.userId,
+        });
 
         const authUser: AuthUser = {
           userId: currentUser.userId,
-          email: attributes.email || email,
-          name: attributes.name || email,
-          role,
+          email: attributes.email || cleanEmail,
+          name: attributes.name || regRecord.name || cleanEmail,
+          role: regRecord.role || role,
+          status: regRecord.status,
+          enrolledProjectIds: regRecord.enrolledProjectIds,
           isMock: false,
         };
         setUser(authUser);
@@ -139,13 +199,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const register = async (data: SignUpData) => {
     setIsLoading(true);
+    const cleanEmail = data.email.toLowerCase().trim();
+    const isSuperAdmin = cleanEmail === ADMIN_EMAIL;
+    const assignedRole: UserRole = isSuperAdmin ? 'admin' : 'guest';
+
     try {
       if (!awsConfig.isConfigured) {
-        const mockUser: AuthUser = {
-          userId: `usr_${Date.now()}`,
-          email: data.email,
+        const regRecord = userService.registerOrUpdateUser({
+          email: cleanEmail,
           name: data.name,
-          role: data.role,
+        });
+
+        const mockUser: AuthUser = {
+          userId: regRecord.userId,
+          email: cleanEmail,
+          name: data.name,
+          role: assignedRole,
+          status: isSuperAdmin ? 'approved' : 'pending',
+          enrolledProjectIds: regRecord.enrolledProjectIds,
           isMock: true,
         };
         setUser(mockUser);
@@ -154,14 +225,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       const result = await amplifySignUp({
-        username: data.email,
+        username: cleanEmail,
         password: data.password,
         options: {
           userAttributes: {
-            email: data.email,
+            email: cleanEmail,
             name: data.name,
           },
         },
+      });
+
+      // Record new registration in our local registry with 'guest' preview role
+      userService.registerOrUpdateUser({
+        email: cleanEmail,
+        name: data.name,
+        userId: result.userId,
       });
 
       return {
@@ -180,7 +258,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return true;
       }
       const result = await amplifyConfirmSignUp({
-        username: email,
+        username: email.toLowerCase().trim(),
         confirmationCode: code,
       });
       return result.isSignUpComplete;
@@ -191,7 +269,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const resendCode = async (email: string): Promise<void> => {
     if (awsConfig.isConfigured) {
-      await amplifyResendSignUpCode({ username: email });
+      await amplifyResendSignUpCode({ username: email.toLowerCase().trim() });
     }
   };
 
@@ -208,11 +286,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const switchMockRole = (role: UserRole) => {
-    const selected = role === 'admin' ? DEMO_USERS.admin : DEMO_USERS.student;
-    setUser(selected);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(selected));
+  const toggleAdminViewMode = () => {
+    setAdminViewMode((prev) => (prev === 'admin' ? 'student' : 'admin'));
   };
+
+  const refreshUser = () => {
+    if (user) {
+      const regRecord = userService.getUserByEmail(user.email);
+      if (regRecord) {
+        setUser((prev) => prev ? {
+          ...prev,
+          role: regRecord.role,
+          status: regRecord.status,
+          enrolledProjectIds: regRecord.enrolledProjectIds,
+        } : null);
+      }
+    }
+  };
+
+  const isAdmin = user?.role === 'admin' || user?.email.toLowerCase() === ADMIN_EMAIL;
 
   return (
     <AuthContext.Provider
@@ -221,13 +313,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isAuthenticated: !!user,
         isLoading,
         isMockMode,
-        role: user?.role || 'student',
+        role: user?.role || 'guest',
+        isAdmin,
+        adminViewMode,
+        toggleAdminViewMode,
         login,
         register,
         confirmRegistration,
         resendCode,
         logout,
-        switchMockRole,
+        refreshUser,
       }}
     >
       {children}

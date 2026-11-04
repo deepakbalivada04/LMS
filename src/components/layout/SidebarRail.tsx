@@ -1,11 +1,24 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BookOpen, Award, GraduationCap } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { Home, BookOpen, Award, GraduationCap, Shield } from 'lucide-react';
 
 export const SidebarRail: React.FC = () => {
   const location = useLocation();
+  const { isAdmin } = useAuth();
 
   const navItems = [
+    ...(isAdmin
+      ? [
+          {
+            id: 'admin',
+            icon: Shield,
+            path: '/admin',
+            label: 'Admin Console',
+            colorClass: 'text-emerald-600 bg-emerald-50',
+          },
+        ]
+      : []),
     { 
       id: 'dashboard', 
       icon: Home, 
@@ -27,6 +40,7 @@ export const SidebarRail: React.FC = () => {
   ];
 
   const isActive = (path: string, id: string) => {
+    if (id === 'admin') return location.pathname === '/admin';
     if (id === 'dashboard') return location.pathname === '/dashboard';
     if (id === 'course') return location.pathname.startsWith('/course') && !location.pathname.includes('/exam');
     if (id === 'exam') return location.pathname.includes('/exam');
@@ -44,7 +58,7 @@ export const SidebarRail: React.FC = () => {
         </div>
       </Link>
 
-      {/* Navigation Icons (Only real student destinations) */}
+      {/* Navigation Icons */}
       <nav className="flex-1 flex flex-col items-center gap-3 w-full px-2">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -57,7 +71,7 @@ export const SidebarRail: React.FC = () => {
               title={item.label}
               className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${
                 active
-                  ? 'bg-sky-50 text-sky-600 shadow-xs font-semibold'
+                  ? (item.id === 'admin' ? 'bg-emerald-50 text-emerald-600 shadow-xs font-semibold' : 'bg-sky-50 text-sky-600 shadow-xs font-semibold')
                   : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'
               }`}
             >

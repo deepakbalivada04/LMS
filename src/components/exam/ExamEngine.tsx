@@ -17,7 +17,8 @@ import {
   AlertTriangle,
   Play,
   Sparkles,
-  Cpu
+  Cpu,
+  Lock
 } from 'lucide-react';
 
 interface ExamEngineProps {
@@ -90,15 +91,16 @@ const QUESTIONS: Question[] = [
 ];
 
 export const ExamEngine: React.FC<ExamEngineProps> = ({ course }) => {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { getCourseProgress, markModuleComplete } = useProgress();
 
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<ExamResultResponse | null>(null);
 
+  const isGuest = role === 'guest';
   const progress = getCourseProgress(course.courseId);
-  const isEligible = progress.completionPercentage >= 100;
+  const isEligible = !isGuest && progress.completionPercentage >= 100;
 
   const handleSelectOption = (questionId: string, optionIndex: number) => {
     setSelectedAnswers((prev) => ({ ...prev, [questionId]: optionIndex }));
@@ -185,8 +187,29 @@ export const ExamEngine: React.FC<ExamEngineProps> = ({ course }) => {
         </div>
       </div>
 
-      {/* Prerequisite Check Banner if not 100% complete */}
-      {!isEligible && (
+      {/* Guest Preview Notice */}
+      {isGuest && (
+        <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <Lock className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-bold text-sm text-amber-900">Enrolled Student Access Required</h3>
+              <p className="text-xs text-amber-800 mt-0.5 max-w-md">
+                Certification exams and AWS S3-signed certificates are reserved for approved enrolled students. Your account is in Guest Preview mode awaiting Admin approval.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/dashboard"
+            className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs shadow-xs transition"
+          >
+            Back to Dashboard
+          </Link>
+        </div>
+      )}
+
+      {/* Prerequisite Check Banner if not 100% complete and not guest */}
+      {!isEligible && !isGuest && (
         <div className="bg-amber-50 border border-amber-200/80 rounded-3xl p-6 text-amber-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
           <div className="flex items-start gap-3">
             <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />

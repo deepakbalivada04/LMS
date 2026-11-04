@@ -13,4 +13,18 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 1200,
   },
+  server: {
+    proxy: {
+      '/api-upload': {
+        target: 'https://4ohsm3skkl.execute-api.ap-southeast-2.amazonaws.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-upload/, '/default'),
+      },
+      '/api-progress': {
+        target: 'https://oiev2k1y60.execute-api.ap-southeast-2.amazonaws.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-progress/, '/default'),
+      },
+    },
+  },
 });

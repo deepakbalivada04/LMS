@@ -1,0 +1,31 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadRawVideos",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::robotics-lms-videos-2026",
+        "arn:aws:s3:::robotics-lms-videos-2026/*"
+      ]
+    },
+    {
+      "Sid": "WriteProcessedHlsVideos",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:PutObjectAcl",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::robotics-lms-videos-processed-2026",
+        "arn:aws:s3:::robotics-lms-videos-processed-2026/*"
+      ]
+    }
+  ]
+}
+
