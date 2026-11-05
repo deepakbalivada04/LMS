@@ -30,13 +30,6 @@ export const userService = {
       }
       let users: UserRecord[] = JSON.parse(stored);
 
-      // Clean out any legacy mock demo accounts
-      users = users.filter(
-        (u) =>
-          u.email.toLowerCase() === SUPER_ADMIN_EMAIL ||
-          !['usr_guest_demo1', 'usr_guest_demo2', 'usr_student_demo3'].includes(u.userId)
-      );
-
       // Ensure super admin always exists
       const hasSuperAdmin = users.some((u) => u.email.toLowerCase() === SUPER_ADMIN_EMAIL);
       if (!hasSuperAdmin) {

@@ -401,3 +401,4 @@ export const academicService = {
     localStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify(list));
   },
 };
+
