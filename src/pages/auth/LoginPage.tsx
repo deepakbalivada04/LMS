@@ -10,7 +10,6 @@ import {
   ArrowRight, 
   Eye, 
   EyeOff, 
-  ShieldCheck, 
   KeyRound,
   ArrowLeft,
   CheckCircle2
@@ -177,8 +176,8 @@ export const LoginPage: React.FC = () => {
         <div className="text-center mb-6">
           <img 
             src={companyLogo} 
-            alt="Company Logo" 
-            className="h-12 sm:h-14 w-auto object-contain mx-auto mb-2"
+            alt="Flynbrd Logo" 
+            className="h-16 sm:h-20 max-w-[240px] w-auto object-contain mx-auto mb-3 hover:scale-105 transition-transform"
           />
           <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono">
             Hands-on Robotics & AI Learning Bench
@@ -234,7 +233,7 @@ export const LoginPage: React.FC = () => {
         {mode === 'signin' && (
           <form onSubmit={handleSignIn} className="space-y-4 text-xs">
             <div>
-              <label className="font-bold text-slate-700 block mb-1">Student / Admin Email</label>
+              <label className="font-bold text-slate-700 block mb-1">Email</label>
               <div className="relative">
                 <input
                   type="email"
@@ -317,7 +316,7 @@ export const LoginPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">Email Address</label>
+              <label className="font-bold text-slate-700 block mb-1">Email</label>
               <div className="relative">
                 <input
                   type="email"
@@ -386,7 +385,7 @@ export const LoginPage: React.FC = () => {
             </p>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">Account Email</label>
+              <label className="font-bold text-slate-700 block mb-1">Email</label>
               <div className="relative">
                 <input
                   type="email"
@@ -529,15 +528,6 @@ export const LoginPage: React.FC = () => {
             </div>
           </form>
         )}
-
-        {/* Trust Badges */}
-        <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-          <span className="flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Amazon Cognito Protected</span>
-          </span>
-          <span className="font-mono text-slate-500">AWS Cloud</span>
-        </div>
 
       </div>
     </div>
