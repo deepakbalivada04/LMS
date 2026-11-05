@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { projectService } from '../../services/projectService';
+import { academicService, Assignment, AssignmentSubmission, Quiz, CertificateRecord } from '../../services/academicService';
 import { HardwareProject } from '../../types/course';
 import { useProgress } from '../../context/ProgressContext';
 import { useAuth } from '../../context/AuthContext';
@@ -18,75 +19,15 @@ import {
   PhoneCall, 
   FileText,
   HelpCircle, 
-  Send,
-  ExternalLink,
   ChevronRight,
   Sparkles,
   CheckCircle2,
   AlertCircle,
-  Cpu,
   Layers,
-  Share2,
-  Calendar
+  Share2
 } from 'lucide-react';
 
 type TabType = 'courses' | 'assignments' | 'quizzes' | 'certifications' | 'support';
-
-interface AssignmentItem {
-  id: string;
-  title: string;
-  courseTitle: string;
-  courseId: string;
-  dueDate: string;
-  points: number;
-  status: 'graded' | 'submitted' | 'due_soon' | 'pending';
-  grade?: string;
-  description: string;
-}
-
-const SAMPLE_ASSIGNMENTS: AssignmentItem[] = [
-  {
-    id: 'asg-1',
-    title: 'Dual Motor L298N Wiring & Common Ground Verification',
-    courseTitle: 'Autonomous Obstacle-Avoiding Rover Kit',
-    courseId: 'crs-esp32-rover',
-    dueDate: 'Nov 12, 2026',
-    points: 100,
-    status: 'graded',
-    grade: '96/100',
-    description: 'Verify wiring from ESP32 PWM pins to L298N motor driver inputs. Ensure LiPo GND is tied together with MCU GND.',
-  },
-  {
-    id: 'asg-2',
-    title: 'Ultrasonic Sonar Echo 3.3V Voltage Divider Protection',
-    courseTitle: 'Autonomous Obstacle-Avoiding Rover Kit',
-    courseId: 'crs-esp32-rover',
-    dueDate: 'Nov 16, 2026',
-    points: 100,
-    status: 'submitted',
-    description: 'Calculate and solder 1kΩ / 2kΩ resistor divider to step down HC-SR04 5V Echo pulse before it reaches GPIO 18.',
-  },
-  {
-    id: 'asg-3',
-    title: 'Obstacle Detection State Machine & Turn Trajectory Run',
-    courseTitle: 'Autonomous Obstacle-Avoiding Rover Kit',
-    courseId: 'crs-esp32-rover',
-    dueDate: 'Nov 20, 2026',
-    points: 100,
-    status: 'due_soon',
-    description: 'Record a 30-second continuous run of the rover detecting a wall at 20cm, executing reverse-turn, and resuming cruise.',
-  },
-  {
-    id: 'asg-4',
-    title: 'Multimeter Voltage Rail & Short Circuit Diagnostics',
-    courseTitle: 'Debugging a Robot That Won\'t Move',
-    courseId: 'skill-debugging-dead-robot',
-    dueDate: 'Nov 25, 2026',
-    points: 100,
-    status: 'pending',
-    description: 'Measure voltage drop across motor terminals under stall current. Record continuity beep checks across battery switches.',
-  },
-];
 
 export const StudentDashboard: React.FC = () => {
   const { user, isAdmin } = useAuth();
@@ -99,6 +40,11 @@ export const StudentDashboard: React.FC = () => {
   };
 
   const [allProjects, setAllProjects] = useState<HardwareProject[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [certificates, setCertificates] = useState<CertificateRecord[]>([]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [simulateNewStudent, setSimulateNewStudent] = useState(false);
@@ -107,7 +53,6 @@ export const StudentDashboard: React.FC = () => {
   const [submittingAssignmentId, setSubmittingAssignmentId] = useState<string | null>(null);
   const [submissionUrl, setSubmissionUrl] = useState('');
   const [submissionNotes, setSubmissionNotes] = useState('');
-  const [submittedIds, setSubmittedIds] = useState<string[]>([]);
 
   // Doubt ticket state
   const [doubtSubject, setDoubtSubject] = useState('');
@@ -118,9 +63,23 @@ export const StudentDashboard: React.FC = () => {
   // Course access request state for pending students
   const [accessRequested, setAccessRequested] = useState(false);
 
-  useEffect(() => {
+  // Fetch dynamic data from services
+  const refreshData = () => {
     setAllProjects(projectService.getAllProjects());
-  }, []);
+    setAssignments(academicService.getAllAssignments());
+    if (user?.email) {
+      setSubmissions(academicService.getSubmissionsForStudent(user.email));
+      setCertificates(academicService.getCertificatesForStudent(user.email));
+    } else {
+      setSubmissions(academicService.getAllSubmissions());
+      setCertificates(academicService.getAllCertificates());
+    }
+    setQuizzes(academicService.getAllQuizzes());
+  };
+
+  useEffect(() => {
+    refreshData();
+  }, [user?.email]);
 
   // Compute allocated courses for this student
   const realEnrolledProjects = projectService.getEnrolledProjectsForUser(
@@ -141,11 +100,20 @@ export const StudentDashboard: React.FC = () => {
 
   const handleAssignmentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!submittingAssignmentId || !submissionUrl) return;
-    setSubmittedIds((prev) => [...prev, submittingAssignmentId]);
+    if (!submittingAssignmentId || !submissionUrl || !user?.email) return;
+
+    academicService.submitAssignment({
+      assignmentId: submittingAssignmentId,
+      studentEmail: user.email,
+      studentName: user.name || user.email.split('@')[0],
+      submissionUrl,
+      notes: submissionNotes,
+    });
+
     setSubmittingAssignmentId(null);
     setSubmissionUrl('');
     setSubmissionNotes('');
+    refreshData();
   };
 
   const handleDoubtSubmit = (e: React.FormEvent) => {
@@ -158,6 +126,8 @@ export const StudentDashboard: React.FC = () => {
       setDoubtSubmitted(false);
     }, 4500);
   };
+
+  const primaryCert = certificates[0];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto py-3">
@@ -195,7 +165,7 @@ export const StudentDashboard: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 1. ORIGINAL METRIC CARDS (NO COPYRIGHT / CLEAN SAAS DESIGN) */}
+      {/* 1. ORIGINAL METRIC CARDS                                  */}
       {/* ========================================================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: My Courses */}
@@ -218,7 +188,7 @@ export const StudentDashboard: React.FC = () => {
               {displayCourses.length}
             </span>
             <span className="text-xs font-semibold text-emerald-600">
-              {displayCourses.length > 0 ? 'Active Curriculum' : 'Awaiting Batch'}
+              {displayCourses.length > 0 ? 'Active Curriculum' : 'Awaiting Allocation'}
             </span>
           </div>
         </div>
@@ -240,10 +210,10 @@ export const StudentDashboard: React.FC = () => {
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              {SAMPLE_ASSIGNMENTS.length}
+              {assignments.length}
             </span>
             <span className="text-xs font-semibold text-amber-600">
-              1 Due This Week
+              {submissions.length} Submitted
             </span>
           </div>
         </div>
@@ -265,7 +235,7 @@ export const StudentDashboard: React.FC = () => {
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              {displayCourses.length > 0 ? displayCourses.length : 4}
+              {quizzes.length}
             </span>
             <span className="text-xs font-semibold text-cyan-600">
               Skills Evaluated
@@ -290,10 +260,10 @@ export const StudentDashboard: React.FC = () => {
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              1
+              {certificates.length}
             </span>
             <span className="text-xs font-semibold text-emerald-600">
-              Verified Certificate
+              {certificates.length > 0 ? 'Verified Issued' : 'Pass Quiz to Earn'}
             </span>
           </div>
         </div>
@@ -333,7 +303,7 @@ export const StudentDashboard: React.FC = () => {
           <FileText className="w-4 h-4" />
           <span>Assignments</span>
           <span className="ml-1 px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-700 text-[10px] font-mono font-bold">
-            {SAMPLE_ASSIGNMENTS.length}
+            {assignments.length}
           </span>
         </button>
 
@@ -348,6 +318,9 @@ export const StudentDashboard: React.FC = () => {
         >
           <Layers className="w-4 h-4" />
           <span>Quizzes</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full bg-cyan-50 text-cyan-700 text-[10px] font-mono font-bold">
+            {quizzes.length}
+          </span>
         </button>
 
         <button
@@ -361,6 +334,11 @@ export const StudentDashboard: React.FC = () => {
         >
           <Award className="w-4 h-4" />
           <span>Certifications</span>
+          {certificates.length > 0 && (
+            <span className="ml-1 px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-mono font-bold">
+              {certificates.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -384,7 +362,6 @@ export const StudentDashboard: React.FC = () => {
       {/* TAB 1: MY COURSES */}
       {activeTab === 'courses' && (
         <div className="space-y-6">
-          {/* If No Courses Assigned Yet: Commercial LMS Pending State */}
           {displayCourses.length === 0 ? (
             <div className="bg-white rounded-2xl p-8 sm:p-12 border border-slate-200/90 shadow-2xs text-center space-y-6 max-w-2xl mx-auto">
               <div className="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center mx-auto shadow-2xs">
@@ -400,7 +377,7 @@ export const StudentDashboard: React.FC = () => {
                   Welcome to RoboLMS, {user?.name || 'Student'}!
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto">
-                  Your student passport has been created successfully. In our academy, specialized robotics courses and hardware kits are allocated directly by the Lead Administrator (<strong className="text-slate-700">sannathkoushik@gmail.com</strong>). Once approved, your assigned hardware projects, video stages, and exams will appear right here.
+                  Your student passport has been created successfully. Courses and hardware lab kits are allocated directly by the Lead Administrator (<strong className="text-slate-700">sannathkoushik@gmail.com</strong>). Once approved, your assigned hardware projects, video stages, and exams will appear right here.
                 </p>
               </div>
 
@@ -468,7 +445,7 @@ export const StudentDashboard: React.FC = () => {
                       {primaryProject.description}
                     </p>
                     <div className="flex items-center gap-4 pt-1 text-xs text-slate-400 font-mono">
-                      <span>{primaryProject.modules?.length || 2} Video Stages</span>
+                      <span>{primaryProject.modules?.length || 0} Video Stages</span>
                       <span>&bull;</span>
                       <span className="text-emerald-400 font-semibold">HLS Video Streaming Ready</span>
                     </div>
@@ -535,14 +512,13 @@ export const StudentDashboard: React.FC = () => {
                       key={project.projectId}
                       className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-md transition-all overflow-hidden flex flex-col"
                     >
-                      {/* Top Header Strip */}
                       <div className="p-5 pb-4 space-y-2 flex-1">
                         <div className="flex items-center justify-between gap-2">
                           <span className="px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-extrabold text-[10px] uppercase tracking-wide border border-indigo-100/80">
                             {project.category}
                           </span>
                           <span className="text-[10px] font-mono text-slate-400">
-                            {project.modules?.length || 1} Stages
+                            {project.modules?.length || 0} Stages
                           </span>
                         </div>
 
@@ -554,7 +530,6 @@ export const StudentDashboard: React.FC = () => {
                           {project.description}
                         </p>
 
-                        {/* Progress Bar */}
                         <div className="pt-3 space-y-1">
                           <div className="flex items-center justify-between text-[11px] font-mono">
                             <span className="text-slate-500 font-sans">Lab Progress</span>
@@ -569,7 +544,6 @@ export const StudentDashboard: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Bottom Action Footer */}
                       <div className="px-5 py-3.5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between gap-2">
                         <Link
                           to={`/course/${project.projectId}`}
@@ -603,21 +577,20 @@ export const StudentDashboard: React.FC = () => {
               <div>
                 <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
                   <FileText className="w-5 h-5 text-amber-500" />
-                  <span>Hands-on Hardware Lab Assignments</span>
+                  <span>Hands-on Hardware Lab Assignments ({assignments.length})</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Complete each practical hardware build milestone and submit your video verification or firmware link.
                 </p>
               </div>
-              <div className="text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200/60 font-mono">
-                {SAMPLE_ASSIGNMENTS.length} Total Assignments
-              </div>
             </div>
           </div>
 
           <div className="space-y-3.5">
-            {SAMPLE_ASSIGNMENTS.map((asg) => {
-              const isSubmitted = submittedIds.includes(asg.id) || asg.status === 'submitted' || asg.status === 'graded';
+            {assignments.map((asg) => {
+              const submission = submissions.find((s) => s.assignmentId === asg.id);
+              const isGraded = submission?.status === 'graded';
+              const isSubmitted = !!submission;
 
               return (
                 <div
@@ -629,10 +602,10 @@ export const StudentDashboard: React.FC = () => {
                       <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
                         {asg.courseTitle}
                       </span>
-                      {asg.status === 'graded' ? (
+                      {isGraded ? (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          <span>Graded • {asg.grade}</span>
+                          <span>Graded • {submission?.grade}/100</span>
                         </span>
                       ) : isSubmitted ? (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-200 flex items-center gap-1">
@@ -655,22 +628,28 @@ export const StudentDashboard: React.FC = () => {
                       {asg.description}
                     </p>
 
+                    {submission?.feedback && (
+                      <div className="p-2.5 rounded-lg bg-emerald-50 text-[11px] text-emerald-800 border border-emerald-200">
+                        <strong>Mentor Feedback:</strong> {submission.feedback}
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-3 pt-1 text-[11px] text-slate-400 font-mono">
                       <span>Max Points: {asg.points}</span>
                       <span>&bull;</span>
-                      <span>Evaluation: Lead Mentor Sannath Koushik</span>
+                      <span>Reviewer: Lead Mentor Sannath Koushik</span>
                     </div>
                   </div>
 
                   <div className="w-full md:w-auto shrink-0">
-                    {asg.status === 'graded' ? (
+                    {isGraded ? (
                       <div className="text-center md:text-right">
                         <span className="text-xs font-bold text-emerald-600 block">Verified Pass</span>
-                        <span className="text-[11px] text-slate-400 font-mono">Score: {asg.grade}</span>
+                        <span className="text-[11px] text-slate-400 font-mono">Score: {submission?.grade}/100</span>
                       </div>
                     ) : isSubmitted ? (
                       <div className="px-4 py-2 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold text-center">
-                        Submitted &bull; Awaiting Grade
+                        Submitted &bull; Awaiting Review
                       </div>
                     ) : (
                       <button
@@ -763,7 +742,7 @@ export const StudentDashboard: React.FC = () => {
           <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-2">
             <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
               <Layers className="w-5 h-5 text-cyan-600" />
-              <span>Skill Evaluation Quizzes & Knowledge Checks</span>
+              <span>Skill Evaluation Quizzes & Knowledge Checks ({quizzes.length})</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Timed interactive exams testing circuit wiring, firmware logic, and hardware debugging. Passing score is 80%.
@@ -771,44 +750,7 @@ export const StudentDashboard: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              {
-                id: 'skill-assembling-first-robot',
-                title: 'Assembling Your First Robot: Wiring & Motor Fundamentals',
-                questions: 10,
-                timeMins: 15,
-                passMark: 80,
-                status: 'Passed (90%)',
-                category: 'Robot Kits',
-              },
-              {
-                id: 'skill-debugging-dead-robot',
-                title: 'Debugging a Robot That Won\'t Move: Continuity & Voltage Drops',
-                questions: 10,
-                timeMins: 15,
-                passMark: 80,
-                status: 'Ready to Take',
-                category: 'Space & Hardware',
-              },
-              {
-                id: 'crs-esp32-rover',
-                title: 'ESP32 Autonomous Obstacle-Avoidance Rover Quiz',
-                questions: 12,
-                timeMins: 20,
-                passMark: 80,
-                status: 'Ready to Take',
-                category: 'Robot Kits',
-              },
-              {
-                id: 'skill-how-rover-finds-its-way',
-                title: 'How a Rover Finds Its Way: Sonar & Sensor Fusion',
-                questions: 8,
-                timeMins: 10,
-                passMark: 80,
-                status: 'Ready to Take',
-                category: 'Space & Hardware',
-              },
-            ].map((quiz) => (
+            {quizzes.map((quiz) => (
               <div
                 key={quiz.id}
                 className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between gap-4 transition hover:border-slate-300"
@@ -818,12 +760,8 @@ export const StudentDashboard: React.FC = () => {
                     <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-100">
                       {quiz.category}
                     </span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                      quiz.status.includes('Passed') 
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                        : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      {quiz.status}
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
+                      Ready to Take
                     </span>
                   </div>
 
@@ -832,21 +770,21 @@ export const StudentDashboard: React.FC = () => {
                   </h4>
 
                   <div className="flex items-center gap-3 text-xs text-slate-400 font-mono">
-                    <span>{quiz.questions} Questions</span>
+                    <span>{quiz.questions.length} Questions</span>
                     <span>&bull;</span>
-                    <span>{quiz.timeMins} Mins</span>
+                    <span>{quiz.timeLimitMinutes} Mins</span>
                     <span>&bull;</span>
-                    <span className="text-slate-600 font-semibold">{quiz.passMark}% to Pass</span>
+                    <span className="text-slate-600 font-semibold">{quiz.passPercentage}% to Pass</span>
                   </div>
                 </div>
 
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                   <span className="text-[11px] text-slate-400 font-sans">Timed Multiple Choice</span>
                   <Link
-                    to={`/course/${quiz.id}/exam`}
+                    to={`/course/${quiz.courseId}/exam`}
                     className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs inline-flex items-center gap-1.5 transition shadow-xs"
                   >
-                    <span>{quiz.status.includes('Passed') ? 'Retake Quiz' : 'Start Quiz'}</span>
+                    <span>Start Quiz</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </Link>
                 </div>
@@ -862,68 +800,83 @@ export const StudentDashboard: React.FC = () => {
           <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-2">
             <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
               <Award className="w-5 h-5 text-emerald-600" />
-              <span>Official Hardware Lab Certifications</span>
+              <span>Official Hardware Lab Certifications ({certificates.length})</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Verified certificates issued upon completing practical build milestones and passing skill quizzes.
             </p>
           </div>
 
-          <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm max-w-3xl mx-auto space-y-6">
-            {/* Certificate Preview Card */}
-            <div className="border-4 border-double border-indigo-200 rounded-2xl p-6 sm:p-10 bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 text-center space-y-4 relative overflow-hidden shadow-xs">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-indigo-600 to-cyan-500 text-white flex items-center justify-center mx-auto shadow-md">
-                <Award className="w-7 h-7" />
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-[10px] font-mono tracking-widest uppercase text-slate-400 font-bold">
-                  FLYnBRD RoboLMS Academy &bull; Certificate of Mastery
-                </p>
-                <h3 className="text-xl sm:text-2xl font-black text-slate-900">
-                  Autonomous Robotics & Hardware Systems
-                </h3>
-              </div>
-
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
-                This certifies that <strong className="text-slate-900">{user?.name || 'Koushik Sannath'}</strong> has demonstrated proficiency in microcontroller interfacing, PWM motor speed controllers, and sensor fusion.
+          {certificates.length === 0 ? (
+            <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-3 max-w-md mx-auto">
+              <Award className="w-10 h-10 text-slate-300 mx-auto" />
+              <h4 className="font-bold text-slate-800 text-sm">No Certificates Issued Yet</h4>
+              <p className="text-xs text-slate-500">
+                Complete your assigned course video stages and pass the skill quiz with 80%+ to unlock your verified credential diploma.
               </p>
+              <button
+                type="button"
+                onClick={() => setActiveTab('quizzes')}
+                className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl"
+              >
+                Go to Quizzes
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm max-w-3xl mx-auto space-y-6">
+              <div className="border-4 border-double border-indigo-200 rounded-2xl p-6 sm:p-10 bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 text-center space-y-4 relative overflow-hidden shadow-xs">
+                <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-indigo-600 to-cyan-500 text-white flex items-center justify-center mx-auto shadow-md">
+                  <Award className="w-7 h-7" />
+                </div>
 
-              <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-500">
-                <span>Credential ID: <strong className="text-slate-800">ROBO-CERT-2026-ESP32</strong></span>
-                <span>Issued: <strong className="text-slate-800">November 2026</strong></span>
-                <span className="text-emerald-600 font-bold flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Verified Authentic</span>
-                </span>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-mono tracking-widest uppercase text-slate-400 font-bold">
+                    RoboLMS Academy &bull; Certificate of Mastery
+                  </p>
+                  <h3 className="text-xl sm:text-2xl font-black text-slate-900">
+                    {primaryCert?.courseTitle || 'Autonomous Robotics & Hardware Systems'}
+                  </h3>
+                </div>
+
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  This certifies that <strong className="text-slate-900">{primaryCert?.studentName || user?.name || 'Koushik Sannath'}</strong> has demonstrated proficiency in microcontroller interfacing, PWM motor speed controllers, and sensor fusion.
+                </p>
+
+                <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-500">
+                  <span>Credential ID: <strong className="text-slate-800">{primaryCert?.certificateNumber || 'ROBO-CERT-2026-ESP32'}</strong></span>
+                  <span>Score: <strong className="text-emerald-600">{primaryCert?.score || 96}%</strong></span>
+                  <span className="text-emerald-600 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Verified Authentic</span>
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                  <Share2 className="w-4 h-4 text-slate-400" />
+                  <span>Share Credential:</span>
+                  <button
+                    type="button"
+                    onClick={() => alert(`Certificate ${primaryCert?.certificateNumber} copied!`)}
+                    className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition"
+                  >
+                    Copy Verification ID
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <Link
+                    to="/course/skill-assembling-first-robot/exam"
+                    className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl inline-flex items-center justify-center gap-2 transition shadow-xs"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download PDF Certificate</span>
+                  </Link>
+                </div>
               </div>
             </div>
-
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                <Share2 className="w-4 h-4 text-slate-400" />
-                <span>Share Credential:</span>
-                <button
-                  type="button"
-                  onClick={() => alert('Certificate link copied to clipboard!')}
-                  className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition"
-                >
-                  Copy Link
-                </button>
-              </div>
-
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <Link
-                  to="/course/skill-assembling-first-robot/exam"
-                  className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl inline-flex items-center justify-center gap-2 transition shadow-xs"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Download PDF Certificate</span>
-                </Link>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -1030,7 +983,7 @@ export const StudentDashboard: React.FC = () => {
               <details className="cursor-pointer py-1.5 border-b border-slate-100">
                 <summary className="font-bold text-slate-700 hover:text-indigo-600">How do I unlock additional courses?</summary>
                 <p className="text-[11px] text-slate-500 pt-1">
-                  Once you enroll in a new hardware batch, Administrator Sannath Koushik assigns the specific kit and course directly to your student email.
+                  Once you enroll in a new hardware batch, Administrator Sannath Koushik assigns the specific kit and course directly to your student email in the Admin Console.
                 </p>
               </details>
               <details className="cursor-pointer py-1.5 border-b border-slate-100">

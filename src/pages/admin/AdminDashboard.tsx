@@ -1,1012 +1,512 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { awsConfig } from '../../aws-exports';
 import { useAuth } from '../../context/AuthContext';
 import { userService } from '../../services/userService';
 import { projectService } from '../../services/projectService';
+import { academicService, Assignment, AssignmentSubmission, Quiz, CertificateRecord } from '../../services/academicService';
 import { videoUploadService } from '../../services/videoUploadService';
-import { UserRecord, UserRole } from '../../types/auth';
-import { HardwareProject, ProjectStage, HardwareItem } from '../../types/course';
+import { UserRecord, UserRole, UserStatus } from '../../types/auth';
+import { HardwareProject, ProjectStage, ProjectCategory } from '../../types/course';
 import { HlsVideoPlayer } from '../../components/player/HlsVideoPlayer';
 import { 
   Shield, 
   Users, 
-  PlusCircle, 
-  CheckCircle, 
-  Clock, 
-  UserCheck, 
-  Key, 
+  BookOpen, 
+  Video, 
+  FileText, 
+  Award, 
   Layers, 
-  Play, 
+  Plus, 
+  Check, 
+  Clock, 
   Trash2, 
   Edit3, 
-  ExternalLink, 
   Search, 
-  Filter, 
-  Copy, 
-  Check, 
-  X, 
-  Cpu, 
-  Video, 
-  Database, 
-  Radio, 
-  Award,
+  UploadCloud, 
+  Play, 
+  CheckCircle2, 
+  AlertCircle, 
+  ArrowLeft,
+  ExternalLink,
+  ChevronRight,
   Sparkles,
-  ArrowRight,
-  Eye,
-  Activity,
-  FileVideo,
-  ListVideo,
-  UploadCloud,
   FileUp,
-  Film,
-  Loader2,
-  Link2
+  Cpu,
+  Eye
 } from 'lucide-react';
 
-type AdminTab = 'users' | 'projects' | 'videos' | 'telemetry';
+type AdminTab = 'students' | 'courses' | 'videos' | 'assignments' | 'quizzes_certs';
 
 export const AdminDashboard: React.FC = () => {
-  const { user, toggleAdminViewMode } = useAuth();
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<AdminTab>('students');
 
-  const [activeTab, setActiveTab] = useState<AdminTab>('users');
-  const [users, setUsers] = useState<UserRecord[]>([]);
+  // Core Data Registries
+  const [students, setStudents] = useState<UserRecord[]>([]);
   const [projects, setProjects] = useState<HardwareProject[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [certificates, setCertificates] = useState<CertificateRecord[]>([]);
+
+  // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'guest' | 'student' | 'teacher'>('all');
 
-  // Selected Project for Video Management tab
+  // ----------------------------------------------------
+  // Video Management State
+  // ----------------------------------------------------
   const [selectedProjectIdForVideo, setSelectedProjectIdForVideo] = useState<string>('crs-esp32-rover');
-
-  // Modal / Drawer states
-  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
-  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
-  const [showAddStageModal, setShowAddStageModal] = useState(false);
-  const [showEditStageModal, setShowEditStageModal] = useState(false);
-
-  // Target Project for Add/Edit Stage
-  const [targetProjectIdForModal, setTargetProjectIdForModal] = useState<string>('crs-esp32-rover');
-  const [editingStageId, setEditingStageId] = useState<string | null>(null);
-
-  // S3 Upload API Endpoint state (can be configured via UI or .env)
-  const [s3UploadApiUrl, setS3UploadApiUrl] = useState<string>(() => {
-    return localStorage.getItem('robolms_s3_upload_api') || awsConfig.getUploadUrlApi || '';
-  });
-
-  // Video File Upload State
-  const [videoInputMode, setVideoInputMode] = useState<'upload' | 'url'>('upload');
   const [selectedVideoFile, setSelectedVideoFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState<number>(0);
-  const [isUploadingToS3, setIsUploadingToS3] = useState<boolean>(false);
+  const [newStageTitle, setNewStageTitle] = useState('');
+  const [newStageDesc, setNewStageDesc] = useState('');
+  const [newStageDuration, setNewStageDuration] = useState(15);
+  const [newStageUrl, setNewStageUrl] = useState('');
+  const [uploadMode, setUploadMode] = useState<'upload' | 'url'>('upload');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [showAddStageModal, setShowAddStageModal] = useState(false);
+  const [activeVideoPreview, setActiveVideoPreview] = useState<string | null>(null);
 
-  // Active Video Preview in Video Management tab
-  const [activePreviewStage, setActivePreviewStage] = useState<{
-    stageTitle: string;
-    videoUrl: string;
-    projectTitle: string;
-  }>({
-    stageTitle: 'Stage 1: Robot Chassis Assembly & Motor Driver Calibration',
-    videoUrl: 'https://robotics-lms-videos-processed-2026.s3.ap-southeast-2.amazonaws.com/projects/crs-esp32-rover/1793905763827-gemini_generated_video_fac0cdb7/hls/1793905763827-gemini_generated_video_fac0cdb7.m3u8',
-    projectTitle: 'Project 1: Autonomous Obstacle-Avoiding Rover Kit',
-  });
+  // ----------------------------------------------------
+  // Course / Learning Path Modal State
+  // ----------------------------------------------------
+  const [showCreateCourseModal, setShowCreateCourseModal] = useState(false);
+  const [newCourseTitle, setNewCourseTitle] = useState('');
+  const [newCourseCategory, setNewCourseCategory] = useState<ProjectCategory>('Robot Kits');
+  const [newCourseKit, setNewCourseKit] = useState('');
+  const [newCourseDesc, setNewCourseDesc] = useState('');
 
-  // Copy indicator
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [generatedPassCard, setGeneratedPassCard] = useState<{
-    name: string;
-    email: string;
-    role: string;
-    tempPass: string;
-    projects: string[];
-  } | null>(null);
+  // ----------------------------------------------------
+  // Assignment Creation / Grading State
+  // ----------------------------------------------------
+  const [showCreateAssignmentModal, setShowCreateAssignmentModal] = useState(false);
+  const [newAsgTitle, setNewAsgTitle] = useState('');
+  const [newAsgCourseId, setNewAsgCourseId] = useState('crs-esp32-rover');
+  const [newAsgDueDate, setNewAsgDueDate] = useState('');
+  const [newAsgPoints, setNewAsgPoints] = useState(100);
+  const [newAsgDesc, setNewAsgDesc] = useState('');
+  const [newAsgRubric, setNewAsgRubric] = useState('');
 
-  // New User Form State
-  const [newUserName, setNewUserName] = useState('');
-  const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserRole, setNewUserRole] = useState<UserRole>('student');
-  const [newUserProjects, setNewUserProjects] = useState<string[]>(['crs-esp32-rover']);
+  // Grading Modal State
+  const [gradingSubmission, setGradingSubmission] = useState<AssignmentSubmission | null>(null);
+  const [gradeScore, setGradeScore] = useState<number>(95);
+  const [gradeFeedback, setGradeFeedback] = useState<string>('');
 
-  // New Project Form State
-  const [newProjId, setNewProjId] = useState('');
-  const [newProjTitle, setNewProjTitle] = useState('');
-  const [newProjDesc, setNewProjDesc] = useState('');
-  const [newProjKit, setNewProjKit] = useState('');
-  const [newProjCategory, setNewProjCategory] = useState<'Robotics' | 'Autonomous Vehicles' | 'IoT & Cloud' | 'Kinematics'>('Robotics');
-  const [newProjLevel, setNewProjLevel] = useState<'Beginner' | 'Intermediate' | 'Advanced'>('Beginner');
-  const [newProjColor, setNewProjColor] = useState('#0ea5e9');
-  
-  // Stage 1 for new project
-  const [newProjStage1Title, setNewProjStage1Title] = useState('Stage 1: Core Hardware Assembly & Pinout Verification');
-  const [newProjStage1Video, setNewProjStage1Video] = useState('');
-  const [newProjStage1BOM, setNewProjStage1BOM] = useState('ESP32 Microcontroller (1x), L298N Motor Driver (1x), 7.4V LiPo Battery (1x)');
+  // ----------------------------------------------------
+  // Certificate Issuance State
+  // ----------------------------------------------------
+  const [showIssueCertModal, setShowIssueCertModal] = useState(false);
+  const [certStudentEmail, setCertStudentEmail] = useState('');
+  const [certCourseId, setCertCourseId] = useState('crs-esp32-rover');
+  const [certScore, setCertScore] = useState(95);
 
-  // Add / Edit Stage Form State
-  const [stageTitle, setStageTitle] = useState('');
-  const [stageDesc, setStageDesc] = useState('');
-  const [stageVideoUrl, setStageVideoUrl] = useState('');
-  const [stageDuration, setStageDuration] = useState(20);
-  const [stageBOMText, setStageBOMText] = useState('');
+  // ----------------------------------------------------
+  // Student Creation Modal State
+  // ----------------------------------------------------
+  const [showCreateStudentModal, setShowCreateStudentModal] = useState(false);
+  const [newStudentName, setNewStudentName] = useState('');
+  const [newStudentEmail, setNewStudentEmail] = useState('');
 
-  // Status feedback toast
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
-
-  const loadData = () => {
-    const loadedUsers = userService.getAllUsers();
-    const loadedProjects = projectService.getAllProjects();
-    setUsers(loadedUsers);
-    setProjects(loadedProjects);
-
-    if (loadedProjects.length > 0 && !loadedProjects.some(p => p.projectId === selectedProjectIdForVideo)) {
-      setSelectedProjectIdForVideo(loadedProjects[0].projectId);
+  // Refresh all state from live services
+  const refreshAll = () => {
+    setStudents(userService.getAllUsers());
+    const allProj = projectService.getAllProjects();
+    setProjects(allProj);
+    if (allProj.length > 0 && !selectedProjectIdForVideo) {
+      setSelectedProjectIdForVideo(allProj[0].projectId);
     }
+    setAssignments(academicService.getAllAssignments());
+    setSubmissions(academicService.getAllSubmissions());
+    setQuizzes(academicService.getAllQuizzes());
+    setCertificates(academicService.getAllCertificates());
   };
 
   useEffect(() => {
-    loadData();
+    refreshAll();
   }, []);
 
-  // Filtered users
-  const filteredUsers = users.filter((u) => {
-    const matchesSearch =
-      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = roleFilter === 'all' || u.role === roleFilter;
-    return matchesSearch && matchesRole;
-  });
+  // ----------------------------------------------------
+  // Student Approval & Course Allocation Handlers
+  // ----------------------------------------------------
+  const handleToggleApproval = (student: UserRecord) => {
+    const nextStatus: UserStatus = student.status === 'approved' ? 'pending' : 'approved';
+    const nextRole: UserRole = nextStatus === 'approved' ? 'student' : 'guest';
+    userService.updateUser(student.userId, { status: nextStatus, role: nextRole });
+    refreshAll();
+  };
 
-  const pendingCount = users.filter((u) => u.role === 'guest' || u.status === 'pending').length;
-
-  // Selected project object for Video tab
-  const currentVideoProject = projects.find((p) => p.projectId === selectedProjectIdForVideo) || projects[0];
-
-  // Handle Video File Selection
-  const handleVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setSelectedVideoFile(file);
-    setUploadProgress(0);
-
-    // Auto-detect video duration
-    const durationMins = await videoUploadService.detectVideoDuration(file);
-    setStageDuration(durationMins);
-
-    // Auto-fill stage title if empty
-    if (!stageTitle) {
-      const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-      setStageTitle(`Stage: ${cleanName}`);
+  const handleToggleCourseAllocation = (student: UserRecord, courseId: string) => {
+    const current = student.enrolledProjectIds || [];
+    let updated: string[];
+    if (current.includes(courseId)) {
+      updated = current.filter((id) => id !== courseId);
+    } else {
+      updated = [...current, courseId];
     }
+    userService.updateUser(student.userId, { enrolledProjectIds: updated });
+    refreshAll();
   };
 
-  // Approve guest -> upgrade to student
-  const handleApproveStudent = (email: string) => {
-    userService.updateUserRole(email, 'student', 'approved');
-    loadData();
-    showToast(`Approved ${email} as Enrolled Student! Access unlocked.`);
-  };
-
-  // Promote to teacher
-  const handlePromoteTeacher = (email: string) => {
-    userService.updateUserRole(email, 'teacher', 'approved');
-    loadData();
-    showToast(`Promoted ${email} to Teacher / Instructor.`);
-  };
-
-  // Demote to guest preview
-  const handleDemoteGuest = (email: string) => {
-    userService.updateUserRole(email, 'guest', 'pending');
-    loadData();
-    showToast(`Changed ${email} to Guest Preview mode.`);
-  };
-
-  // Toggle project enrollment for a student
-  const handleToggleEnrollment = (email: string, projectId: string) => {
-    const target = users.find((u) => u.email === email);
-    if (!target) return;
-    const current = target.enrolledProjectIds || [];
-    const updated = current.includes(projectId)
-      ? current.filter((id) => id !== projectId)
-      : [...current, projectId];
-    userService.updateUserEnrollments(email, updated);
-    loadData();
-    showToast(`Updated project enrollments for ${target.name}.`);
-  };
-
-  // Toggle pathway enrollment for a student (e.g. Robot Kits, AI, Space, Code)
-  const handleTogglePathway = (email: string, pathwayId: any) => {
-    const target = users.find((u) => u.email === email);
-    if (!target) return;
-    const current = target.enrolledPathways || [];
-    const updated = current.includes(pathwayId)
-      ? current.filter((id) => id !== pathwayId)
-      : [...current, pathwayId];
-    userService.updateUserPathways(email, updated as any);
-    loadData();
-    showToast(`Updated pathway access for ${target.name}.`);
-  };
-
-  // Delete user
-  const handleDeleteUser = (email: string) => {
-    if (window.confirm(`Are you sure you want to remove user ${email}?`)) {
-      try {
-        userService.deleteUser(email);
-        loadData();
-        showToast(`User ${email} removed.`);
-      } catch (err: any) {
-        alert(err.message);
-      }
-    }
-  };
-
-  // Generate / Create User Credentials
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleCreateStudent = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUserEmail || !newUserName) return;
-
-    const tempPassword = `RoboPass@${Math.floor(1000 + Math.random() * 9000)}`;
-
-    userService.createUserByAdmin({
-      name: newUserName,
-      email: newUserEmail,
-      role: newUserRole,
-      projectIds: newUserProjects,
-      notes: `Directly generated by Admin on ${new Date().toLocaleDateString()}`,
+    if (!newStudentEmail) return;
+    userService.registerOrUpdateUser({
+      name: newStudentName || newStudentEmail.split('@')[0],
+      email: newStudentEmail,
     });
-
-    setGeneratedPassCard({
-      name: newUserName,
-      email: newUserEmail,
-      role: newUserRole,
-      tempPass: tempPassword,
-      projects: newUserProjects,
-    });
-
-    loadData();
-    setNewUserName('');
-    setNewUserEmail('');
-    showToast(`Credentials generated for ${newUserName}!`);
+    setNewStudentName('');
+    setNewStudentEmail('');
+    setShowCreateStudentModal(false);
+    refreshAll();
   };
 
-  // Create Project
-  const handleCreateProject = (e: React.FormEvent) => {
+  // ----------------------------------------------------
+  // Course / Learning Path Creation Handler
+  // ----------------------------------------------------
+  const handleCreateCourse = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProjId || !newProjTitle) return;
-
-    const formattedId = newProjId.toLowerCase().startsWith('crs-') ? newProjId : `crs-${newProjId.toLowerCase().replace(/\s+/g, '-')}`;
-
-    const bomItems: HardwareItem[] = newProjStage1BOM.split(',').map((item, idx) => ({
-      id: `bom-${Date.now()}-${idx}`,
-      name: item.trim(),
-      quantity: 1,
-      description: 'Physical hardware component included in kit.',
-    }));
-
-    const stage1: ProjectStage = {
-      stageId: `mod-1`,
-      moduleId: `mod-1`,
-      title: newProjStage1Title,
-      description: 'Follow the hardware video build instructions and verify all sensor/motor pin connections.',
-      durationMinutes: 25,
-      videoUrl: newProjStage1Video,
-      hardwareChecklist: bomItems,
-      wiringDiagrams: [
-        {
-          id: 'wd-init',
-          title: 'Initial Power and Logic Rail Wiring',
-          diagramType: 'l298n-motor',
-          description: 'Establish common ground and connect MCU logic pins.',
-          pinConnections: [
-            { from: 'MCU 3.3V', to: 'Sensor VCC', signalType: 'Power', color: '#f43f5e' },
-            { from: 'MCU GND', to: 'Common Ground Rail', signalType: 'Ground', color: '#64748b' },
-          ],
-        },
-      ],
-      codeSnippets: [
-        {
-          id: 'snip-init',
-          filename: 'hardware_selftest.ino',
-          language: 'arduino',
-          description: 'Microcontroller hardware peripheral self-test loop.',
-          code: `void setup() {\n  Serial.begin(115200);\n  Serial.println("Hardware Kit: Self-test initialized successfully!");\n}\n\nvoid loop() {\n  delay(1000);\n}`,
-        },
-      ],
-    };
-
-    const newProject: HardwareProject = {
-      projectId: formattedId,
-      courseId: formattedId,
-      title: newProjTitle,
-      description: newProjDesc,
-      level: newProjLevel,
-      category: newProjCategory,
-      hardwareKit: newProjKit || `${newProjTitle} Hardware Kit`,
-      accentColor: newProjColor,
-      modules: [stage1],
-    };
-
-    try {
-      projectService.createProject(newProject);
-      loadData();
-      setShowCreateProjectModal(false);
-      showToast(`Created new hardware project "${newProjTitle}"!`);
-      setSelectedProjectIdForVideo(formattedId);
-      // Reset form
-      setNewProjId('');
-      setNewProjTitle('');
-      setNewProjDesc('');
-      setNewProjKit('');
-    } catch (err: any) {
-      alert(err.message);
-    }
+    if (!newCourseTitle) return;
+    const cleanId = `crs-${newCourseTitle.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+    projectService.createProject({
+      projectId: cleanId,
+      courseId: cleanId,
+      title: newCourseTitle,
+      category: newCourseCategory,
+      hardwareKit: newCourseKit || 'Standard ESP32 & Sensors Lab Kit',
+      description: newCourseDesc,
+      level: 'Intermediate',
+      accentColor: '#4f46e5',
+      modules: [],
+    });
+    setNewCourseTitle('');
+    setNewCourseKit('');
+    setNewCourseDesc('');
+    setShowCreateCourseModal(false);
+    refreshAll();
   };
 
-  // Open Add Stage Modal for a specific project
-  const openAddStageModal = (projectId: string) => {
-    setTargetProjectIdForModal(projectId);
-    setStageTitle('');
-    setStageDesc('');
-    setStageVideoUrl('');
-    setSelectedVideoFile(null);
-    setUploadProgress(0);
-    setVideoInputMode('upload');
-    setStageDuration(20);
-    setStageBOMText('');
-    setShowAddStageModal(true);
-  };
-
-  // Open Edit Stage Modal
-  const openEditStageModal = (projectId: string, stage: ProjectStage) => {
-    setTargetProjectIdForModal(projectId);
-    setEditingStageId(stage.stageId || stage.moduleId);
-    setStageTitle(stage.title);
-    setStageDesc(stage.description);
-    setStageVideoUrl(stage.videoUrl);
-    setSelectedVideoFile(null);
-    setUploadProgress(0);
-    setVideoInputMode('url');
-    setStageDuration(stage.durationMinutes || 20);
-    setStageBOMText(stage.hardwareChecklist.map((h) => h.name).join(', '));
-    setShowEditStageModal(true);
-  };
-
-  // Submit Add Stage to a specific project (with S3 Video Upload)
+  // ----------------------------------------------------
+  // Video Stage Upload / Add Handler
+  // ----------------------------------------------------
   const handleAddStage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!targetProjectIdForModal || !stageTitle) return;
+    if (!newStageTitle || !selectedProjectIdForVideo) return;
 
-    let finalVideoUrl = stageVideoUrl;
+    let finalVideoUrl = newStageUrl;
 
-    if (videoInputMode === 'upload') {
-      if (!selectedVideoFile) {
-        alert('Please choose a video file (.mp4, .mov, .webm) to upload to Amazon S3.');
-        return;
-      }
-
-      if (s3UploadApiUrl) {
-        awsConfig.getUploadUrlApi = s3UploadApiUrl;
-      }
-
-      setIsUploadingToS3(true);
-      setUploadProgress(5);
-
+    if (uploadMode === 'upload' && selectedVideoFile) {
       try {
+        setIsUploading(true);
+        setUploadProgress(10);
         const uploadResult = await videoUploadService.uploadVideoToS3({
           file: selectedVideoFile,
-          projectId: targetProjectIdForModal,
-          onProgress: (percent) => setUploadProgress(percent),
+          projectId: selectedProjectIdForVideo,
+          onProgress: (pct: number) => setUploadProgress(pct),
         });
-
         finalVideoUrl = uploadResult.hlsUrl || uploadResult.s3Url;
       } catch (err: any) {
-        setIsUploadingToS3(false);
-        alert(`S3 Upload failed: ${err.message}`);
+        alert(`Video upload failed: ${err.message}`);
+        setIsUploading(false);
         return;
       } finally {
-        setIsUploadingToS3(false);
+        setIsUploading(false);
       }
     }
 
     if (!finalVideoUrl) {
-      alert('Video file upload or streaming URL is required.');
+      alert('Please select a video file or enter an S3/HLS URL.');
       return;
     }
 
-    const bomItems: HardwareItem[] = stageBOMText
-      ? stageBOMText.split(',').map((item, idx) => ({
-          id: `bom-${Date.now()}-${idx}`,
-          name: item.trim(),
-          quantity: 1,
-          description: 'Hardware module required for this video build step.',
-        }))
-      : [];
-
+    const cleanStageId = `stg-${Date.now()}`;
     const newStage: ProjectStage = {
-      stageId: `mod-${Date.now()}`,
-      moduleId: `mod-${Date.now()}`,
-      title: stageTitle,
-      description: stageDesc || 'Hardware stage build instructions and video tutorial.',
-      durationMinutes: stageDuration,
+      stageId: cleanStageId,
+      moduleId: cleanStageId,
+      title: newStageTitle,
+      description: newStageDesc,
+      durationMinutes: Number(newStageDuration) || 15,
       videoUrl: finalVideoUrl,
-      hardwareChecklist: bomItems,
+      hardwareChecklist: [],
       wiringDiagrams: [],
       codeSnippets: [],
     };
 
-    projectService.addStage(targetProjectIdForModal, newStage);
-    loadData();
+    projectService.addStage(selectedProjectIdForVideo, newStage);
+    setNewStageTitle('');
+    setNewStageDesc('');
+    setNewStageUrl('');
+    setSelectedVideoFile(null);
     setShowAddStageModal(false);
-
-    // Update preview to this new stage
-    const proj = projects.find((p) => p.projectId === targetProjectIdForModal);
-    setActivePreviewStage({
-      stageTitle: newStage.title,
-      videoUrl: newStage.videoUrl,
-      projectTitle: proj?.title || 'Selected Project',
-    });
-
-    showToast(`Video uploaded to S3 and added to ${proj?.title || targetProjectIdForModal}!`);
+    refreshAll();
   };
 
-  // Submit Edit Stage
-  const handleSaveEditedStage = async (e: React.FormEvent) => {
+  // ----------------------------------------------------
+  // Assignment Creation & Grading Handlers
+  // ----------------------------------------------------
+  const handleCreateAssignment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!targetProjectIdForModal || !editingStageId) return;
-
-    let finalVideoUrl = stageVideoUrl;
-
-    if (videoInputMode === 'upload' && selectedVideoFile) {
-      if (s3UploadApiUrl) {
-        awsConfig.getUploadUrlApi = s3UploadApiUrl;
-      }
-      setIsUploadingToS3(true);
-      setUploadProgress(5);
-      try {
-        const uploadResult = await videoUploadService.uploadVideoToS3({
-          file: selectedVideoFile,
-          projectId: targetProjectIdForModal,
-          onProgress: (percent) => setUploadProgress(percent),
-        });
-        finalVideoUrl = uploadResult.hlsUrl || uploadResult.s3Url;
-      } catch (err: any) {
-        setIsUploadingToS3(false);
-        alert(`S3 Upload failed: ${err.message}`);
-        return;
-      } finally {
-        setIsUploadingToS3(false);
-      }
-    }
-
-    const bomItems: HardwareItem[] = stageBOMText
-      ? stageBOMText.split(',').map((item, idx) => ({
-          id: `bom-${Date.now()}-${idx}`,
-          name: item.trim(),
-          quantity: 1,
-          description: 'Hardware component required for this video step.',
-        }))
-      : [];
-
-    projectService.updateStage(targetProjectIdForModal, editingStageId, {
-      title: stageTitle,
-      description: stageDesc,
-      videoUrl: finalVideoUrl,
-      durationMinutes: stageDuration,
-      hardwareChecklist: bomItems.length > 0 ? bomItems : undefined,
+    if (!newAsgTitle || !newAsgCourseId) return;
+    const proj = projects.find((p) => p.projectId === newAsgCourseId);
+    academicService.createAssignment({
+      courseId: newAsgCourseId,
+      courseTitle: proj?.title || 'Hardware Lab',
+      title: newAsgTitle,
+      description: newAsgDesc,
+      dueDate: newAsgDueDate || '2026-11-20',
+      points: Number(newAsgPoints) || 100,
+      rubric: newAsgRubric,
     });
+    setNewAsgTitle('');
+    setNewAsgDesc('');
+    setNewAsgRubric('');
+    setShowCreateAssignmentModal(false);
+    refreshAll();
+  };
 
-    loadData();
-    setShowEditStageModal(false);
+  const handleSaveGrade = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!gradingSubmission) return;
+    academicService.gradeSubmission(gradingSubmission.id, gradeScore, gradeFeedback);
+    setGradingSubmission(null);
+    refreshAll();
+  };
 
-    // Update preview if it was the currently viewed stage
-    setActivePreviewStage({
-      stageTitle: stageTitle,
-      videoUrl: finalVideoUrl,
-      projectTitle: currentVideoProject.title,
+  // ----------------------------------------------------
+  // Certificate Issuance Handler
+  // ----------------------------------------------------
+  const handleIssueCertificate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!certStudentEmail || !certCourseId) return;
+    const student = students.find((s) => s.email.toLowerCase() === certStudentEmail.toLowerCase());
+    const proj = projects.find((p) => p.projectId === certCourseId);
+    academicService.issueCertificate({
+      studentEmail: certStudentEmail,
+      studentName: student?.name || certStudentEmail.split('@')[0],
+      courseId: certCourseId,
+      courseTitle: proj?.title || 'Robotics Specialization',
+      score: certScore,
     });
-
-    showToast(`Saved updates for "${stageTitle}" on S3!`);
+    setShowIssueCertModal(false);
+    refreshAll();
   };
 
-  // Delete Stage from Project
-  const handleDeleteStage = (projectId: string, stageId: string) => {
-    if (window.confirm('Are you sure you want to remove this video stage from this project?')) {
-      projectService.deleteStage(projectId, stageId);
-      loadData();
-      showToast('Video stage removed from project.');
-    }
-  };
-
-  // Delete project
-  const handleDeleteProject = (projectId: string) => {
-    if (window.confirm(`Are you sure you want to delete project ${projectId}?`)) {
-      projectService.deleteProject(projectId);
-      loadData();
-      showToast(`Project ${projectId} deleted.`);
-    }
-  };
-
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
+  const selectedProjectObj = projects.find((p) => p.projectId === selectedProjectIdForVideo) || projects[0];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 w-full space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto py-3">
       {/* ========================================================= */}
-      {/* 1. SUPER ADMIN HERO HEADER                                */}
+      {/* TOP ADMIN HEADER BAR                                      */}
       {/* ========================================================= */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl border border-slate-700/60 relative overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 w-96 bg-gradient-to-l from-emerald-500/10 via-sky-500/5 to-transparent pointer-events-none" />
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-semibold mb-3">
-              <Shield className="w-3.5 h-3.5" />
-              <span>SUPER ADMINISTRATOR CONSOLE</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-            </div>
-
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
-              Robotics Lab Operations & Project Curriculum
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-              Logged in as <span className="text-emerald-300 font-bold">{user?.email}</span>. Upload video build files directly to Amazon S3, approve students, issue credentials, and configure physical kit stages.
-            </p>
+      <div className="bg-slate-900 rounded-2xl p-6 text-white border border-slate-800 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[11px] font-mono tracking-widest uppercase text-emerald-400 font-bold">
+              Super Administrator Console
+            </span>
           </div>
-
-          {/* Quick Action Buttons */}
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <button
-              type="button"
-              onClick={toggleAdminViewMode}
-              className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-600 font-semibold text-xs flex items-center gap-2 transition"
-              title="Preview what students see on their dashboard"
-            >
-              <Eye className="w-4 h-4 text-sky-400" />
-              <span>Switch to Student View</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowCreateUserModal(true)}
-              className="py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs flex items-center gap-2 transition shadow-md shadow-sky-600/30"
-            >
-              <Key className="w-4 h-4" />
-              <span>Generate Credentials</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => openAddStageModal(selectedProjectIdForVideo)}
-              className="py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-2 transition shadow-md shadow-indigo-600/30"
-            >
-              <UploadCloud className="w-4 h-4" />
-              <span>Upload Video to Project</span>
-            </button>
-          </div>
+          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
+            <Cpu className="w-6 h-6 text-indigo-400" />
+            <span>RoboLMS Academy Control Hub</span>
+          </h2>
+          <p className="text-xs text-slate-400">
+            Live database sync: Manage students, allocate courses, upload S3 video stages, grade assignments, and issue certificates.
+          </p>
         </div>
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-slate-800 text-xs">
-          <div>
-            <div className="text-slate-400 flex items-center gap-1.5 mb-1">
-              <Users className="w-3.5 h-3.5 text-sky-400" />
-              <span>Total Users</span>
-            </div>
-            <div className="text-2xl font-bold text-white">{users.length}</div>
-          </div>
-
-          <div>
-            <div className="text-slate-400 flex items-center gap-1.5 mb-1">
-              <Clock className="w-3.5 h-3.5 text-amber-400" />
-              <span>Pending Approvals</span>
-            </div>
-            <div className="text-2xl font-bold text-amber-300 flex items-center gap-2">
-              {pendingCount}
-              {pendingCount > 0 && (
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-semibold border border-amber-500/40">
-                  Needs Review
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <div className="text-slate-400 flex items-center gap-1.5 mb-1">
-              <Layers className="w-3.5 h-3.5 text-purple-400" />
-              <span>Hardware Projects</span>
-            </div>
-            <div className="text-2xl font-bold text-white">{projects.length}</div>
-          </div>
-
-          <div>
-            <div className="text-slate-400 flex items-center gap-1.5 mb-1">
-              <UploadCloud className="w-3.5 h-3.5 text-emerald-400" />
-              <span>S3 Video Bucket</span>
-            </div>
-            <div className="text-xs font-semibold text-emerald-400 flex items-center gap-1 mt-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              robotics-lms-videos-2026
-            </div>
-          </div>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/dashboard"
+            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-2 transition border border-slate-700"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>View Student Portal</span>
+          </Link>
         </div>
       </div>
 
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center gap-2 shadow-sm animate-fade-in">
-          <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* ========================================================= */}
-      {/* 2. TAB NAVIGATION                                         */}
+      {/* 5 ADMIN CONSOLE TABS                                      */}
       {/* ========================================================= */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-3 overflow-x-auto text-xs font-bold">
+      <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto text-xs font-semibold pt-1">
         <button
           type="button"
-          onClick={() => setActiveTab('users')}
-          className={`px-4 py-2 rounded-xl flex items-center gap-2 transition ${
-            activeTab === 'users'
-              ? 'bg-sky-500 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          onClick={() => setActiveTab('students')}
+          className={`pb-3 px-4 transition-all whitespace-nowrap flex items-center gap-2 border-b-2 ${
+            activeTab === 'students'
+              ? 'text-indigo-600 font-extrabold border-indigo-600'
+              : 'text-slate-500 border-transparent hover:text-slate-800'
           }`}
         >
-          <UserCheck className="w-4 h-4" />
-          <span>Student Approvals & Credentials</span>
-          {pendingCount > 0 && (
-            <span className={`px-2 py-0.5 text-[10px] rounded-full ${
-              activeTab === 'users' ? 'bg-white text-sky-600' : 'bg-amber-100 text-amber-800'
-            }`}>
-              {pendingCount}
-            </span>
-          )}
+          <Users className="w-4 h-4" />
+          <span>Students & Approvals</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-mono font-bold">
+            {students.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('courses')}
+          className={`pb-3 px-4 transition-all whitespace-nowrap flex items-center gap-2 border-b-2 ${
+            activeTab === 'courses'
+              ? 'text-indigo-600 font-extrabold border-indigo-600'
+              : 'text-slate-500 border-transparent hover:text-slate-800'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>Courses & Learning Paths</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-mono font-bold">
+            {projects.length}
+          </span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('videos')}
-          className={`px-4 py-2 rounded-xl flex items-center gap-2 transition ${
+          className={`pb-3 px-4 transition-all whitespace-nowrap flex items-center gap-2 border-b-2 ${
             activeTab === 'videos'
-              ? 'bg-sky-500 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'text-indigo-600 font-extrabold border-indigo-600'
+              : 'text-slate-500 border-transparent hover:text-slate-800'
           }`}
         >
-          <FileVideo className="w-4 h-4" />
-          <span>Project Videos & S3 Upload</span>
+          <Video className="w-4 h-4" />
+          <span>Video Stages & S3 Upload</span>
         </button>
 
         <button
           type="button"
-          onClick={() => setActiveTab('projects')}
-          className={`px-4 py-2 rounded-xl flex items-center gap-2 transition ${
-            activeTab === 'projects'
-              ? 'bg-sky-500 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          onClick={() => setActiveTab('assignments')}
+          className={`pb-3 px-4 transition-all whitespace-nowrap flex items-center gap-2 border-b-2 ${
+            activeTab === 'assignments'
+              ? 'text-indigo-600 font-extrabold border-indigo-600'
+              : 'text-slate-500 border-transparent hover:text-slate-800'
           }`}
         >
-          <Layers className="w-4 h-4" />
-          <span>Hardware Kit Projects ({projects.length})</span>
+          <FileText className="w-4 h-4" />
+          <span>Assignments & Grading</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-700 text-[10px] font-mono font-bold">
+            {submissions.filter((s) => s.status === 'submitted').length} Pending
+          </span>
         </button>
 
         <button
           type="button"
-          onClick={() => setActiveTab('telemetry')}
-          className={`px-4 py-2 rounded-xl flex items-center gap-2 transition ${
-            activeTab === 'telemetry'
-              ? 'bg-sky-500 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          onClick={() => setActiveTab('quizzes_certs')}
+          className={`pb-3 px-4 transition-all whitespace-nowrap flex items-center gap-2 border-b-2 ${
+            activeTab === 'quizzes_certs'
+              ? 'text-indigo-600 font-extrabold border-indigo-600'
+              : 'text-slate-500 border-transparent hover:text-slate-800'
           }`}
         >
-          <Activity className="w-4 h-4" />
-          <span>AWS Architecture Telemetry</span>
+          <Award className="w-4 h-4" />
+          <span>Quizzes & Certificates</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-mono font-bold">
+            {certificates.length} Issued
+          </span>
         </button>
       </div>
 
       {/* ========================================================= */}
-      {/* TAB 1: USER APPROVALS & CREDENTIALS                       */}
+      {/* TAB 1: STUDENTS & APPROVALS                               */}
       {/* ========================================================= */}
-      {activeTab === 'users' && (
-        <div className="space-y-6">
-          {/* Generated Pass Card Alert (if generated) */}
-          {generatedPassCard && (
-            <div className="p-5 rounded-2xl bg-gradient-to-r from-sky-50 to-emerald-50 border border-sky-200 text-slate-800 shadow-sm relative">
-              <button
-                type="button"
-                onClick={() => setGeneratedPassCard(null)}
-                className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              <div className="flex items-center gap-2 text-sky-700 text-xs font-bold uppercase tracking-wider mb-2">
-                <Sparkles className="w-4 h-4 text-sky-600" />
-                <span>Generated Student Access Passport</span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs mt-3 bg-white p-4 rounded-xl border border-sky-100 font-mono">
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-sans">Full Name & Email</span>
-                  <span className="font-bold text-slate-800">{generatedPassCard.name}</span>
-                  <span className="text-slate-500 block truncate">{generatedPassCard.email}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-sans">Role & Temp Password</span>
-                  <span className="inline-block px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-bold uppercase text-[10px]">
-                    {generatedPassCard.role}
-                  </span>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="font-bold text-emerald-700">{generatedPassCard.tempPass}</span>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(generatedPassCard.tempPass, 'temp-pass')}
-                      className="text-slate-400 hover:text-slate-600"
-                      title="Copy Password"
-                    >
-                      {copiedId === 'temp-pass' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-sans">Enrolled Kits</span>
-                  <span className="text-slate-700 block font-sans">
-                    {generatedPassCard.projects.length} project(s) assigned
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Search & Filter Toolbar */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+      {activeTab === 'students' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="relative w-full sm:w-72">
               <input
                 type="text"
-                placeholder="Search by student name or email..."
+                placeholder="Search students by name or email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-sky-500 transition"
+                className="w-full bg-white border border-slate-200 rounded-xl pl-3 pr-8 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
               />
+              <Search className="w-3.5 h-3.5 absolute right-3 top-2.5 text-slate-400 pointer-events-none" />
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto text-xs">
-              <Filter className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-slate-500 font-semibold">Filter:</span>
-              {(['all', 'guest', 'student', 'teacher'] as const).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRoleFilter(r)}
-                  className={`px-3 py-1.5 rounded-lg font-bold capitalize transition ${
-                    roleFilter === r
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {r === 'guest' ? 'Guests (Pending)' : r}
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowCreateStudentModal(true)}
+              className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center justify-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Register Student</span>
+            </button>
           </div>
 
-          {/* Users Table */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-800">
-                  Registered Members & Hardware Lab Passports
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Self-registered users join as Guests. Click "Approve as Student" to unlock kit stages and exams.
-                </p>
-              </div>
-              <span className="text-xs text-slate-500 font-semibold font-mono">
-                {filteredUsers.length} user(s)
-              </span>
-            </div>
-
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider text-[10px] font-bold">
-                    <th className="py-3 px-4">Member Info</th>
-                    <th className="py-3 px-3">Role</th>
-                    <th className="py-3 px-3">Status</th>
-                    <th className="py-3 px-3">Kit Enrollments</th>
-                    <th className="py-3 px-4 text-right">Admin Approval Actions</th>
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                  <tr>
+                    <th className="py-3 px-4">Student</th>
+                    <th className="py-3 px-4">Status & Approval</th>
+                    <th className="py-3 px-4">Course Allocation (Click to toggle)</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredUsers.map((userRecord) => {
-                    const isSelfAdmin = userRecord.email.toLowerCase() === user?.email.toLowerCase();
-                    const isPendingGuest = userRecord.role === 'guest' || userRecord.status === 'pending';
+                  {students
+                    .filter((s) => s.email.toLowerCase().includes(searchQuery.toLowerCase()) || (s.name || '').toLowerCase().includes(searchQuery.toLowerCase()))
+                    .map((s) => {
+                      const isApproved = s.status === 'approved';
+                      const enrolled = s.enrolledProjectIds || [];
 
-                    return (
-                      <tr
-                        key={userRecord.userId}
-                        className={`transition hover:bg-slate-50/80 ${
-                          isPendingGuest ? 'bg-amber-50/30' : ''
-                        }`}
-                      >
-                        {/* Member Info */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-slate-800 text-xs">
-                            {userRecord.name}
-                          </div>
-                          <div className="text-slate-400 font-mono text-[11px]">
-                            {userRecord.email}
-                          </div>
-                          {userRecord.notes && (
-                            <div className="text-[10px] text-slate-400 mt-0.5 italic">
-                              {userRecord.notes}
-                            </div>
-                          )}
-                        </td>
+                      return (
+                        <tr key={s.userId} className="hover:bg-slate-50/50 transition">
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-slate-900">{s.name || 'Unnamed Student'}</div>
+                            <div className="text-[11px] font-mono text-slate-400">{s.email}</div>
+                          </td>
 
-                        {/* Role Badge */}
-                        <td className="py-3.5 px-3">
-                          {userRecord.role === 'admin' && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px] uppercase">
-                              <Shield className="w-3 h-3 text-emerald-600" />
-                              Super Admin
-                            </span>
-                          )}
-                          {userRecord.role === 'student' && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-sky-100 text-sky-800 font-bold text-[10px] uppercase">
-                              Student
-                            </span>
-                          )}
-                          {userRecord.role === 'teacher' && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-100 text-purple-800 font-bold text-[10px] uppercase">
-                              Teacher
-                            </span>
-                          )}
-                          {userRecord.role === 'guest' && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-100 text-amber-800 font-bold text-[10px] uppercase animate-pulse">
-                              <Clock className="w-3 h-3 text-amber-600" />
-                              Guest Preview
-                            </span>
-                          )}
-                        </td>
+                          <td className="py-3.5 px-4">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleApproval(s)}
+                              className={`px-3 py-1 rounded-full text-[11px] font-bold transition inline-flex items-center gap-1.5 ${
+                                isApproved
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                              }`}
+                            >
+                              {isApproved ? <Check className="w-3 h-3 stroke-[3]" /> : <Clock className="w-3 h-3" />}
+                              <span>{isApproved ? 'Approved' : 'Pending Approval (Click to Approve)'}</span>
+                            </button>
+                          </td>
 
-                        {/* Status */}
-                        <td className="py-3.5 px-3">
-                          {userRecord.status === 'approved' ? (
-                            <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold text-[11px]">
-                              <CheckCircle className="w-3.5 h-3.5" />
-                              Approved
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-amber-600 font-semibold text-[11px]">
-                              <Clock className="w-3.5 h-3.5" />
-                              Pending Approval
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Enrolled Pathways & Projects */}
-                        <td className="py-3.5 px-3">
-                          <div className="space-y-1.5 max-w-xs">
-                            {/* Pathways */}
-                            <div>
-                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Pathways</span>
-                              <div className="flex flex-wrap gap-1">
-                                {[
-                                  { id: 'robot-kits', label: 'Robot Kits' },
-                                  { id: 'how-ai-thinks', label: 'AI' },
-                                  { id: 'space-and-hardware', label: 'Space & Hardware' },
-                                  { id: 'prompting-and-code', label: 'Prompt & Code' },
-                                ].map((pw) => {
-                                  const isEnrolled = userRecord.enrolledPathways?.includes('all') || userRecord.enrolledPathways?.includes(pw.id);
-                                  return (
-                                    <button
-                                      key={pw.id}
-                                      type="button"
-                                      disabled={isSelfAdmin}
-                                      onClick={() => handleTogglePathway(userRecord.email, pw.id)}
-                                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition ${
-                                        isEnrolled
-                                          ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                                          : 'bg-slate-100 text-slate-400 hover:bg-slate-200 border border-transparent'
-                                      }`}
-                                      title={isEnrolled ? `Enrolled in ${pw.label}` : `Enroll in ${pw.label}`}
-                                    >
-                                      {isEnrolled ? `✓ ${pw.label}` : `+ ${pw.label}`}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                            
-                            {/* Individual Projects */}
-                            <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-100">
-                              {projects.map((proj) => {
-                                const isEnrolled = userRecord.enrolledProjectIds?.includes(proj.projectId);
+                          <td className="py-3.5 px-4">
+                            <div className="flex flex-wrap gap-1.5 max-w-md">
+                              {projects.map((p) => {
+                                const isAllocated = enrolled.includes(p.projectId);
                                 return (
                                   <button
-                                    key={proj.projectId}
+                                    key={p.projectId}
                                     type="button"
-                                    disabled={isSelfAdmin}
-                                    onClick={() => handleToggleEnrollment(userRecord.email, proj.projectId)}
-                                    className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition ${
-                                      isEnrolled
-                                        ? 'bg-sky-50 text-sky-700 border border-sky-200'
-                                        : 'bg-slate-50 text-slate-400 hover:bg-slate-100 border border-transparent line-through'
+                                    onClick={() => handleToggleCourseAllocation(s, p.projectId)}
+                                    title={p.title}
+                                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold transition border ${
+                                      isAllocated
+                                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                                        : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
                                     }`}
-                                    title={isEnrolled ? `Click to unenroll from ${proj.title}` : `Click to enroll in ${proj.title}`}
                                   >
-                                    {proj.title.split(':')[0]}
+                                    {isAllocated ? '✓ ' : '+ '}
+                                    {p.title.length > 20 ? `${p.title.slice(0, 20)}...` : p.title}
                                   </button>
                                 );
                               })}
                             </div>
-                          </div>
-                        </td>
+                          </td>
 
-                        {/* Approval Actions */}
-                        <td className="py-3.5 px-4 text-right">
-                          {isSelfAdmin ? (
-                            <span className="text-[11px] text-slate-400 italic">Current Session</span>
-                          ) : (
-                            <div className="flex items-center justify-end gap-1.5">
-                              {/* 1-Click Approve as Student */}
-                              {userRecord.role !== 'student' && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleApproveStudent(userRecord.email)}
-                                  className="py-1 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs transition"
-                                  title="Approve user and grant Student lab passport"
-                                >
-                                  <UserCheck className="w-3.5 h-3.5" />
-                                  <span>Approve Student</span>
-                                </button>
-                              )}
-
-                              {/* Promote to Teacher */}
-                              {userRecord.role !== 'teacher' && (
-                                <button
-                                  type="button"
-                                  onClick={() => handlePromoteTeacher(userRecord.email)}
-                                  className="py-1 px-2.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold text-[11px] border border-purple-200 transition"
-                                  title="Make Instructor"
-                                >
-                                  Teacher
-                                </button>
-                              )}
-
-                              {/* Demote to Guest */}
-                              {userRecord.role !== 'guest' && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDemoteGuest(userRecord.email)}
-                                  className="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] transition"
-                                  title="Demote to guest preview"
-                                >
-                                  Guest
-                                </button>
-                              )}
-
-                              {/* Remove */}
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteUser(userRecord.email)}
-                                className="p-1 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition"
-                                title="Delete user"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          <td className="py-3.5 px-4 text-right">
+                            <span className="text-[11px] font-mono text-slate-400">
+                              {enrolled.length} Assigned
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
@@ -1015,386 +515,73 @@ export const AdminDashboard: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* TAB 2: PROJECT VIDEOS & S3 UPLOAD                         */}
+      {/* TAB 2: COURSES & LEARNING PATHS                           */}
       {/* ========================================================= */}
-      {activeTab === 'videos' && (
-        <div className="space-y-6">
-          {/* Top Notice: Clean Project-Scoped Structure */}
-          <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <UploadCloud className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-xs font-extrabold text-indigo-900 uppercase tracking-wide flex items-center gap-1.5">
-                  <span>Amazon S3 Direct Video Upload</span>
-                  <span className="text-[10px] bg-indigo-200/80 px-2 py-0.5 rounded font-mono text-indigo-800">
-                    s3://robotics-lms-videos-2026
-                  </span>
-                </h4>
-                <p className="text-xs text-indigo-800 mt-0.5 leading-relaxed">
-                  Select a video file from your computer to upload directly to Amazon S3. The video is set <strong>strictly under your chosen project</strong> and immediately streams in the student learning workbench.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => openAddStageModal(selectedProjectIdForVideo)}
-              className="py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition shrink-0 shadow-sm"
-            >
-              <UploadCloud className="w-4 h-4" />
-              <span>Upload Video to this Project</span>
-            </button>
-          </div>
-
-          {/* Project Switcher Bar */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                Select Project to Manage its S3 Video Curriculum:
-              </span>
-              <a
-                href={`/course/${currentVideoProject.projectId}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs font-bold text-sky-600 hover:text-sky-700 inline-flex items-center gap-1"
-              >
-                <span>Open in Student View</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </div>
-
-            {/* Project Tabs Pills */}
-            <div className="flex flex-wrap items-center gap-2">
-              {projects.map((proj) => {
-                const isSelected = proj.projectId === selectedProjectIdForVideo;
-                return (
-                  <button
-                    key={proj.projectId}
-                    type="button"
-                    onClick={() => {
-                      setSelectedProjectIdForVideo(proj.projectId);
-                      if (proj.modules.length > 0) {
-                        setActivePreviewStage({
-                          stageTitle: proj.modules[0].title,
-                          videoUrl: proj.modules[0].videoUrl,
-                          projectTitle: proj.title,
-                        });
-                      }
-                    }}
-                    className={`py-2 px-3.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
-                      isSelected
-                        ? 'bg-slate-900 text-white shadow-sm'
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
-                    }`}
-                  >
-                    <span
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: proj.accentColor || '#0ea5e9' }}
-                    />
-                    <span>{proj.title.split(':')[0]}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${
-                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
-                    }`}>
-                      {proj.modules.length} video(s)
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Video List & Live Preview Split */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left Column: Video Stages List for Selected Project */}
-            <div className="lg:col-span-7 space-y-4">
-              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2 text-xs font-bold text-sky-600 mb-1">
-                    <Cpu className="w-4 h-4" />
-                    <span>{currentVideoProject.hardwareKit}</span>
-                  </div>
-                  <h3 className="text-base font-extrabold text-slate-800">
-                    {currentVideoProject.title}
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {currentVideoProject.modules.length} Video Build Step(s) Configured
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => openAddStageModal(currentVideoProject.projectId)}
-                  className="py-2 px-3.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold text-xs flex items-center gap-1.5 transition border border-sky-200 shrink-0"
-                >
-                  <UploadCloud className="w-3.5 h-3.5" />
-                  <span>+ Upload Video Stage</span>
-                </button>
-              </div>
-
-              {/* Stages List */}
-              <div className="space-y-3">
-                {currentVideoProject.modules.map((stage, idx) => {
-                  const isCurrentPreview = activePreviewStage.videoUrl === stage.videoUrl;
-
-                  return (
-                    <div
-                      key={stage.stageId || stage.moduleId || idx}
-                      className={`bg-white rounded-2xl p-4 border transition ${
-                        isCurrentPreview
-                          ? 'border-sky-400 ring-2 ring-sky-100 shadow-sm'
-                          : 'border-slate-100 hover:border-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 flex-1 min-w-0">
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 ${
-                            isCurrentPreview ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-700'
-                          }`}>
-                            {idx + 1}
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-xs font-bold text-slate-800 leading-snug">
-                              {stage.title}
-                            </h4>
-                            <p className="text-[11px] text-slate-500 line-clamp-2 mt-1">
-                              {stage.description}
-                            </p>
-
-                            <div className="flex flex-wrap items-center gap-2 mt-2 text-[10px] text-slate-400">
-                              <span className="flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">
-                                <Clock className="w-3 h-3 text-sky-500" />
-                                {stage.durationMinutes || 20} mins
-                              </span>
-                              <span className="flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">
-                                <Cpu className="w-3 h-3 text-emerald-500" />
-                                {stage.hardwareChecklist?.length || 0} BOM Part(s)
-                              </span>
-                              <span className="font-mono text-slate-400 truncate max-w-xs">
-                                {stage.videoUrl}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Stage Actions */}
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActivePreviewStage({
-                                stageTitle: stage.title,
-                                videoUrl: stage.videoUrl,
-                                projectTitle: currentVideoProject.title,
-                              });
-                            }}
-                            className={`p-2 rounded-xl text-xs font-bold flex items-center gap-1 transition ${
-                              isCurrentPreview
-                                ? 'bg-sky-500 text-white'
-                                : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
-                            }`}
-                            title="Preview video stream in player"
-                          >
-                            <Play className="w-3.5 h-3.5 fill-current" />
-                            <span className="hidden sm:inline">Play</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => openEditStageModal(currentVideoProject.projectId, stage)}
-                            className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition border border-transparent hover:border-slate-200"
-                            title="Edit Video or Re-upload"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-
-                          {currentVideoProject.modules.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteStage(currentVideoProject.projectId, stage.stageId || stage.moduleId)}
-                              className="p-2 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition"
-                              title="Delete stage"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Right Column: Embedded Workbench Video Player Preview */}
-            <div className="lg:col-span-5 bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-4 sticky top-6">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div>
-                  <span className="text-[10px] font-bold text-sky-500 uppercase tracking-wider block">
-                    Active Video Preview
-                  </span>
-                  <h4 className="text-xs font-bold text-slate-800 truncate max-w-xs">
-                    {activePreviewStage.stageTitle}
-                  </h4>
-                </div>
-                <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
-                  Ready
-                </span>
-              </div>
-
-              {/* Video Player */}
-              <div className="bg-black rounded-2xl overflow-hidden aspect-video relative flex items-center justify-center shadow-inner">
-                <HlsVideoPlayer
-                  key={activePreviewStage.videoUrl}
-                  src={activePreviewStage.videoUrl}
-                  title={activePreviewStage.stageTitle}
-                />
-              </div>
-
-              {/* Video Stream Info */}
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-600 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-slate-700">Video Storage URL:</span>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(activePreviewStage.videoUrl, 'vid-url')}
-                    className="text-sky-600 hover:text-sky-700 font-bold flex items-center gap-1"
-                  >
-                    {copiedId === 'vid-url' ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                    <span>Copy</span>
-                  </button>
-                </div>
-                <div className="font-mono text-slate-500 break-all text-[10px]">
-                  {activePreviewStage.videoUrl}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* TAB 3: HARDWARE PROJECTS OVERVIEW                         */}
-      {/* ========================================================= */}
-      {activeTab === 'projects' && (
-        <div className="space-y-6">
+      {activeTab === 'courses' && (
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-extrabold text-slate-800">
-                Hardware Kit Project Catalog
-              </h3>
-              <p className="text-xs text-slate-400">
-                Create new robotics kit projects, add step-by-step video stages, and configure live BOM pinouts.
-              </p>
-            </div>
+            <h3 className="font-extrabold text-sm text-slate-900">
+              RoboLMS Curriculum Catalog ({projects.length} Courses)
+            </h3>
             <button
               type="button"
-              onClick={() => setShowCreateProjectModal(true)}
-              className="py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm"
+              onClick={() => setShowCreateCourseModal(true)}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center gap-1.5"
             >
-              <PlusCircle className="w-4 h-4" />
-              <span>Add New Hardware Project</span>
+              <Plus className="w-4 h-4" />
+              <span>Add Course / Learning Path</span>
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((proj) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {projects.map((p) => (
               <div
-                key={proj.projectId}
-                className="bg-white rounded-2xl border border-slate-100 shadow-xs p-5 flex flex-col justify-between hover:shadow-md transition"
+                key={p.projectId}
+                className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs space-y-3 flex flex-col justify-between"
               >
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-2">
-                    <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-[10px] uppercase">
-                      {proj.category}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold text-[10px] uppercase">
+                      {p.category}
                     </span>
-                    <span className="font-mono text-[11px] text-slate-400 font-medium">
-                      {proj.level}
+                    <span className="text-[10px] font-mono text-slate-400">
+                      {p.modules?.length || 0} Stages
                     </span>
                   </div>
 
-                  <h4 className="text-base font-bold text-slate-800 leading-snug mb-1">
-                    {proj.title}
+                  <h4 className="font-extrabold text-sm text-slate-900 leading-snug">
+                    {p.title}
                   </h4>
-                  <p className="text-xs text-slate-500 line-clamp-2 mb-3">
-                    {proj.description}
+
+                  <p className="text-xs text-slate-500 line-clamp-2">
+                    {p.description}
                   </p>
 
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-600 space-y-1 mb-4">
-                    <div className="font-semibold text-slate-700 flex items-center gap-1">
-                      <Cpu className="w-3.5 h-3.5 text-sky-500" />
-                      <span>{proj.hardwareKit}</span>
-                    </div>
-                    <div className="text-slate-400">
-                      {proj.modules.length} Build Stage(s) with Video Instructions
-                    </div>
-                  </div>
-
-                  {/* Stages List */}
-                  <div className="space-y-1.5 mb-4">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Video Stages
-                    </span>
-                    {proj.modules.map((mod, idx) => (
-                      <div
-                        key={mod.stageId || idx}
-                        className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50/80 border border-slate-100"
-                      >
-                        <div className="flex items-center gap-2 truncate pr-2">
-                          <Play className="w-3 h-3 text-sky-500 shrink-0" />
-                          <span className="font-medium text-slate-700 truncate">{mod.title}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedProjectIdForVideo(proj.projectId);
-                            setActivePreviewStage({
-                              stageTitle: mod.title,
-                              videoUrl: mod.videoUrl,
-                              projectTitle: proj.title,
-                            });
-                            setActiveTab('videos');
-                          }}
-                          className="text-[10px] text-sky-600 font-bold hover:underline shrink-0"
-                        >
-                          Manage Video
-                        </button>
-                      </div>
-                    ))}
+                  <div className="pt-1 text-[11px] font-mono text-slate-400">
+                    Kit: <strong className="text-slate-700">{p.hardwareKit}</strong>
                   </div>
                 </div>
 
-                {/* Bottom Card Actions */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => {
-                      setSelectedProjectIdForVideo(proj.projectId);
-                      openAddStageModal(proj.projectId);
+                      setSelectedProjectIdForVideo(p.projectId);
+                      setActiveTab('videos');
                     }}
-                    className="py-1.5 px-3 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold text-xs flex items-center gap-1 transition"
+                    className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"
                   >
-                    <UploadCloud className="w-3.5 h-3.5" />
-                    <span>Upload Video Stage</span>
+                    <span>Manage Video Stages</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
                   </button>
 
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={`/course/${proj.projectId}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition"
-                      title="Open in Lab Workbench"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteProject(proj.projectId)}
-                      className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition"
-                      title="Delete Project"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  <Link
+                    to={`/course/${p.projectId}`}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                    title="Preview Course"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </Link>
                 </div>
               </div>
             ))}
@@ -1403,337 +590,515 @@ export const AdminDashboard: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* TAB 4: AWS ARCHITECTURE TELEMETRY                          */}
+      {/* TAB 3: VIDEO STAGES & S3 UPLOAD                           */}
       {/* ========================================================= */}
-      {activeTab === 'telemetry' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs">
-              <div className="flex items-center gap-2 text-sky-600 text-xs font-bold uppercase mb-2">
-                <Database className="w-4 h-4" />
-                <span>DynamoDB State Machine</span>
-              </div>
-              <div className="text-xl font-extrabold text-slate-800 font-mono">LMS_Progress</div>
-              <div className="text-xs text-slate-400 mt-1">
-                Partition Key: <span className="font-mono text-slate-600">userId</span>, Sort Key: <span className="font-mono text-slate-600">courseId</span>
-              </div>
-              <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-emerald-600 font-semibold flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                Single-table design synced with API Gateway
-              </div>
-            </div>
+      {activeTab === 'videos' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-7 space-y-4">
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-900">
+                    Course Video Stages
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    Select a course to view, add, or upload video stages to Amazon S3.
+                  </p>
+                </div>
 
-            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs">
-              <div className="flex items-center gap-2 text-purple-600 text-xs font-bold uppercase mb-2">
-                <Users className="w-4 h-4" />
-                <span>Cognito User Pool</span>
+                <button
+                  type="button"
+                  onClick={() => setShowAddStageModal(true)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center gap-1.5 shrink-0"
+                >
+                  <UploadCloud className="w-4 h-4" />
+                  <span>Upload Video Stage</span>
+                </button>
               </div>
-              <div className="text-xl font-extrabold text-slate-800 font-mono">ap-southeast-2_hq8eihEvK</div>
-              <div className="text-xs text-slate-400 mt-1">
-                Client ID: <span className="font-mono text-slate-600">785fvfqalvbmv8gtdt4999meml</span>
-              </div>
-              <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-emerald-600 font-semibold flex items-center gap-1.5">
-                <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                Direct Frontend Auth (No Secret, SPA Safe)
-              </div>
-            </div>
 
-            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs">
-              <div className="flex items-center gap-2 text-emerald-600 text-xs font-bold uppercase mb-2">
-                <UploadCloud className="w-4 h-4" />
-                <span>S3 Video Storage</span>
-              </div>
-              <div className="text-xl font-extrabold text-slate-800 font-mono">robotics-lms-videos-2026</div>
-              <div className="text-xs text-slate-400 mt-1">
-                Region: <span className="font-mono text-slate-600">ap-southeast-2</span>
-              </div>
-              <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-emerald-600 font-semibold flex items-center gap-1.5">
-                <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                Direct S3 Presigned Upload Pipeline Active
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* MODAL: ADD VIDEO LESSON DIRECTLY TO A PROJECT (S3 UPLOAD) */}
-      {/* ========================================================= */}
-      {showAddStageModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 relative animate-fade-in max-h-[90vh] overflow-y-auto">
-            <button
-              type="button"
-              disabled={isUploadingToS3}
-              onClick={() => setShowAddStageModal(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 disabled:opacity-30"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
-                <UploadCloud className="w-5 h-5" />
-              </div>
               <div>
-                <h3 className="text-base font-extrabold text-slate-800">
-                  Upload Video to Project
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Video will be uploaded to S3 and attached strictly to this project's curriculum.
-                </p>
-              </div>
-            </div>
-
-            <form onSubmit={handleAddStage} className="space-y-4">
-              {/* Target Project Dropdown */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Target Hardware Project *
-                </label>
+                <label className="font-bold text-slate-700 text-xs block mb-1">Select Course</label>
                 <select
-                  disabled={isUploadingToS3}
-                  value={targetProjectIdForModal}
-                  onChange={(e) => setTargetProjectIdForModal(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:bg-white focus:border-indigo-500"
+                  value={selectedProjectIdForVideo}
+                  onChange={(e) => setSelectedProjectIdForVideo(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-semibold"
                 >
                   {projects.map((p) => (
                     <option key={p.projectId} value={p.projectId}>
-                      {p.title}
+                      {p.title} ({p.modules?.length || 0} stages)
                     </option>
                   ))}
                 </select>
               </div>
+            </div>
 
-              {/* Mode Toggle: File Upload vs Direct URL */}
-              <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-xs font-bold">
-                <button
-                  type="button"
-                  disabled={isUploadingToS3}
-                  onClick={() => setVideoInputMode('upload')}
-                  className={`py-2 rounded-lg flex items-center justify-center gap-1.5 transition ${
-                    videoInputMode === 'upload'
-                      ? 'bg-white text-indigo-600 shadow-xs'
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
+            {/* List of Stages */}
+            <div className="space-y-3">
+              {(selectedProjectObj?.modules || []).map((stage, idx) => (
+                <div
+                  key={stage.stageId}
+                  className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex items-start justify-between gap-3 transition hover:border-slate-300"
                 >
-                  <FileUp className="w-3.5 h-3.5" />
-                  <span>Upload Video File (S3)</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={isUploadingToS3}
-                  onClick={() => setVideoInputMode('url')}
-                  className={`py-2 rounded-lg flex items-center justify-center gap-1.5 transition ${
-                    videoInputMode === 'url'
-                      ? 'bg-white text-indigo-600 shadow-xs'
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  <Link2 className="w-3.5 h-3.5" />
-                  <span>Paste S3 / HLS Link</span>
-                </button>
-              </div>
-
-              {/* MODE 1: FILE UPLOAD ZONE */}
-              {videoInputMode === 'upload' && (
-                <div className="space-y-3">
-                  {/* S3 Upload Endpoint Config Indicator */}
-                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-700 flex items-center gap-1.5">
-                        <UploadCloud className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>Amazon S3 Upload Endpoint (API Gateway)</span>
-                      </span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        s3UploadApiUrl ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {s3UploadApiUrl ? 'Connected' : 'Paste Endpoint'}
-                      </span>
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                      {idx + 1}
                     </div>
-                    <input
-                      type="url"
-                      placeholder="https://...execute-api.../getVideoUploadUrl"
-                      value={s3UploadApiUrl}
-                      disabled={isUploadingToS3}
-                      onChange={(e) => {
-                        const val = e.target.value.trim();
-                        setS3UploadApiUrl(val);
-                        localStorage.setItem('robolms_s3_upload_api', val);
-                        awsConfig.getUploadUrlApi = val;
-                      }}
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-                    />
-                    {!s3UploadApiUrl && (
-                      <p className="text-[10px] text-amber-700 leading-tight">
-                        To upload files to S3, paste your API Gateway endpoint above (e.g. from <code>aws/getUploadUrl/function.zip</code>).
+                    <div className="space-y-1 flex-1 min-w-0">
+                      <h5 className="font-bold text-xs text-slate-900 leading-snug">
+                        {stage.title}
+                      </h5>
+                      <p className="text-[11px] text-slate-500 line-clamp-1">
+                        {stage.description}
                       </p>
-                    )}
+                      <div className="text-[10px] font-mono text-slate-400 truncate">
+                        URL: {stage.videoUrl}
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Video File (.mp4, .mov, .webm) *
-                    </label>
-                    <div className="p-4 border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/40 rounded-2xl text-center transition cursor-pointer relative">
-                      <input
-                        type="file"
-                        accept="video/mp4,video/webm,video/quicktime,video/x-matroska,.mp4,.mov,.webm,.mkv"
-                        disabled={isUploadingToS3}
-                        onChange={handleVideoFileChange}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                      <UploadCloud className="w-8 h-8 text-indigo-500 mx-auto mb-1.5" />
-                      {selectedVideoFile ? (
-                        <div>
-                          <span className="text-xs font-bold text-slate-800 block truncate">
-                            {selectedVideoFile.name}
-                          </span>
-                          <span className="text-[11px] text-indigo-600 font-semibold block mt-0.5">
-                            {videoUploadService.formatBytes(selectedVideoFile.size)} &bull; Ready to upload to S3
-                          </span>
-                        </div>
-                      ) : (
-                        <div>
-                          <span className="text-xs font-bold text-indigo-900 block">
-                            Choose a video file or drag and drop
-                          </span>
-                          <span className="text-[10px] text-slate-400 block mt-0.5">
-                            Directly uploads to s3://robotics-lms-videos-2026/projects/{targetProjectIdForModal}/
-                          </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setActiveVideoPreview(stage.videoUrl)}
+                      className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 font-bold text-xs transition flex items-center gap-1"
+                    >
+                      <Play className="w-3 h-3 fill-current" />
+                      <span>Preview</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right Column: Active Video Player Preview */}
+          <div className="lg:col-span-5 bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs space-y-3 sticky top-20">
+            <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+              <Video className="w-4 h-4 text-indigo-600" />
+              <span>Video Playback Inspector</span>
+            </h4>
+            <div className="rounded-xl overflow-hidden bg-black aspect-video border border-slate-800">
+              {activeVideoPreview ? (
+                <HlsVideoPlayer
+                  src={activeVideoPreview}
+                  title="Stage Preview"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 text-xs gap-2 p-6 text-center">
+                  <Play className="w-8 h-8 text-slate-600" />
+                  <span>Click "Preview" on any stage to inspect live HLS streaming playback.</span>
+                </div>
+              )}
+            </div>
+            {activeVideoPreview && (
+              <p className="text-[10px] font-mono text-slate-500 break-all">
+                Source: {activeVideoPreview}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 4: ASSIGNMENTS & GRADING                              */}
+      {/* ========================================================= */}
+      {activeTab === 'assignments' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-extrabold text-sm text-slate-900">
+                Hardware Lab Assignments & Student Submissions
+              </h3>
+              <p className="text-xs text-slate-500">
+                Create practical build tasks, review student video links, and assign grades with feedback.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCreateAssignmentModal(true)}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create Assignment</span>
+            </button>
+          </div>
+
+          {/* Submissions Pending Review */}
+          <div className="space-y-3">
+            <h4 className="font-extrabold text-xs text-slate-700 uppercase tracking-wider">
+              Student Submissions ({submissions.length})
+            </h4>
+
+            {submissions.length === 0 ? (
+              <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center text-xs text-slate-400">
+                No student submissions received yet.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {submissions.map((sub) => {
+                  const asg = assignments.find((a) => a.id === sub.assignmentId);
+                  const isGraded = sub.status === 'graded';
+
+                  return (
+                    <div
+                      key={sub.id}
+                      className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          isGraded ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700 animate-pulse'
+                        }`}>
+                          {isGraded ? `Graded • ${sub.grade}/100` : 'Pending Review'}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-400">
+                          {new Date(sub.submittedAt).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      <div>
+                        <h5 className="font-bold text-xs text-slate-900">{sub.studentName}</h5>
+                        <p className="text-[11px] font-mono text-slate-400">{sub.studentEmail}</p>
+                      </div>
+
+                      <div className="text-xs text-slate-700">
+                        Task: <strong className="text-slate-900">{asg?.title || sub.assignmentId}</strong>
+                      </div>
+
+                      {sub.notes && (
+                        <div className="p-2.5 rounded-lg bg-slate-50 text-[11px] text-slate-600">
+                          "{sub.notes}"
                         </div>
                       )}
+
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                        <a
+                          href={sub.submissionUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"
+                        >
+                          <span>Open Submission URL</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGradingSubmission(sub);
+                            setGradeScore(sub.grade || 95);
+                            setGradeFeedback(sub.feedback || '');
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition"
+                        >
+                          {isGraded ? 'Update Grade' : 'Grade Submission'}
+                        </button>
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 5: QUIZZES & CERTIFICATES                             */}
+      {/* ========================================================= */}
+      {activeTab === 'quizzes_certs' && (
+        <div className="space-y-6">
+          {/* Certificates Section */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                  <Award className="w-5 h-5 text-emerald-600" />
+                  <span>Issued Verified Certificates ({certificates.length})</span>
+                </h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Issue diplomas to approved students or revoke existing credentials.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowIssueCertModal(true)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Issue Certificate</span>
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                  <tr>
+                    <th className="py-2.5 px-3">Certificate ID</th>
+                    <th className="py-2.5 px-3">Student</th>
+                    <th className="py-2.5 px-3">Course</th>
+                    <th className="py-2.5 px-3">Score</th>
+                    <th className="py-2.5 px-3">Issued Date</th>
+                    <th className="py-2.5 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                  {certificates.map((cert) => (
+                    <tr key={cert.id} className="hover:bg-slate-50">
+                      <td className="py-2.5 px-3 font-bold text-indigo-700">{cert.certificateNumber}</td>
+                      <td className="py-2.5 px-3 font-sans text-slate-900 font-bold">{cert.studentName} ({cert.studentEmail})</td>
+                      <td className="py-2.5 px-3 font-sans text-slate-700">{cert.courseTitle}</td>
+                      <td className="py-2.5 px-3 font-bold text-emerald-600">{cert.score}%</td>
+                      <td className="py-2.5 px-3 text-slate-400">{new Date(cert.issuedAt).toLocaleDateString()}</td>
+                      <td className="py-2.5 px-3 text-right font-sans">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`Revoke certificate ${cert.certificateNumber}?`)) {
+                              academicService.revokeCertificate(cert.id);
+                              refreshAll();
+                            }
+                          }}
+                          className="text-rose-600 hover:underline font-bold text-xs"
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Quizzes Bank */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-2xs space-y-4">
+            <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+              <Layers className="w-5 h-5 text-indigo-600" />
+              <span>Skill Quiz Bank ({quizzes.length})</span>
+            </h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {quizzes.map((quiz) => (
+                <div key={quiz.id} className="p-4 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-900">{quiz.title}</span>
+                    <span className="font-mono text-slate-400">{quiz.questions.length} Questions</span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 font-mono">
+                    Time: {quiz.timeLimitMinutes}m &bull; Pass Mark: {quiz.passPercentage}%
+                  </div>
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <Link
+                      to={`/course/${quiz.courseId}/exam`}
+                      className="text-indigo-600 font-bold hover:underline flex items-center gap-1"
+                    >
+                      <span>Test Quiz Player</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
                   </div>
                 </div>
-              )}
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
-              {/* MODE 2: DIRECT URL */}
-              {videoInputMode === 'url' && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Direct S3 or Streaming URL *
+      {/* ========================================================= */}
+      {/* MODALS                                                    */}
+      {/* ========================================================= */}
+
+      {/* 1. Create Student Modal */}
+      {showCreateStudentModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-slate-200 shadow-xl space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h4 className="font-extrabold text-sm text-slate-900">Register New Student</h4>
+              <button onClick={() => setShowCreateStudentModal(false)} className="text-slate-400 font-bold text-sm">&times;</button>
+            </div>
+            <form onSubmit={handleCreateStudent} className="space-y-3">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Rahul Verma"
+                  value={newStudentName}
+                  onChange={(e) => setNewStudentName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Email Address*</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="student@example.com"
+                  value={newStudentEmail}
+                  onChange={(e) => setNewStudentEmail(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowCreateStudentModal(false)} className="px-4 py-2 bg-slate-100 rounded-lg font-bold">Cancel</button>
+                <button type="submit" className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-lg">Register</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Create Course Modal */}
+      {showCreateCourseModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 border border-slate-200 shadow-xl space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h4 className="font-extrabold text-sm text-slate-900">Add Learning Path / Course</h4>
+              <button onClick={() => setShowCreateCourseModal(false)} className="text-slate-400 font-bold text-sm">&times;</button>
+            </div>
+            <form onSubmit={handleCreateCourse} className="space-y-3">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Course Title*</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Autonomous Robotic Arm 6-DOF Kinematics"
+                  value={newCourseTitle}
+                  onChange={(e) => setNewCourseTitle(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Category</label>
+                <select
+                  value={newCourseCategory}
+                  onChange={(e) => setNewCourseCategory(e.target.value as ProjectCategory)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="Robot Kits">Robot Kits</option>
+                  <option value="Space and Hardware">Space and Hardware</option>
+                  <option value="How AI Thinks">How AI Thinks</option>
+                  <option value="Prompting and Code">Prompting and Code</option>
+                </select>
+              </div>
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Hardware Kit Specifications</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 6x MG996R Servos, PCA9685 PWM Driver, Arduino Mega"
+                  value={newCourseKit}
+                  onChange={(e) => setNewCourseKit(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Description</label>
+                <textarea
+                  rows={3}
+                  placeholder="Comprehensive description of the hardware project and learning goals..."
+                  value={newCourseDesc}
+                  onChange={(e) => setNewCourseDesc(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowCreateCourseModal(false)} className="px-4 py-2 bg-slate-100 rounded-lg font-bold">Cancel</button>
+                <button type="submit" className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-lg">Create Course</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Add Video Stage Modal */}
+      {showAddStageModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 border border-slate-200 shadow-xl space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h4 className="font-extrabold text-sm text-slate-900">Upload / Add Video Stage</h4>
+              <button onClick={() => setShowAddStageModal(false)} className="text-slate-400 font-bold text-sm">&times;</button>
+            </div>
+            <form onSubmit={handleAddStage} className="space-y-3">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Stage Title*</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Stage 3: Sonar Trigger Pulse & Echo Timing"
+                  value={newStageTitle}
+                  onChange={(e) => setNewStageTitle(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Description</label>
+                <textarea
+                  rows={2}
+                  placeholder="Detailed instructions for student assembly or coding in this stage..."
+                  value={newStageDesc}
+                  onChange={(e) => setNewStageDesc(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Upload Mode Switcher */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={uploadMode === 'upload'}
+                      onChange={() => setUploadMode('upload')}
+                    />
+                    <span>Direct File Upload to AWS S3</span>
                   </label>
-                  <input
-                    type="url"
-                    disabled={isUploadingToS3}
-                    placeholder="https://robotics-lms-videos-2026.s3.ap-southeast-2.amazonaws.com/... or .m3u8"
-                    value={stageVideoUrl}
-                    onChange={(e) => setStageVideoUrl(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:bg-white focus:border-indigo-500"
-                  />
+                  <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={uploadMode === 'url'}
+                      onChange={() => setUploadMode('url')}
+                    />
+                    <span>Existing S3 / HLS URL</span>
+                  </label>
                 </div>
-              )}
 
-              {/* Upload Progress Bar (when uploading) */}
-              {isUploadingToS3 && (
-                <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-indigo-900">
-                    <span className="flex items-center gap-1.5">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
-                      Uploading video to Amazon S3...
-                    </span>
-                    <span>{uploadProgress}%</span>
+                {uploadMode === 'upload' ? (
+                  <div>
+                    <input
+                      type="file"
+                      accept="video/mp4,video/quicktime,video/webm"
+                      onChange={(e) => setSelectedVideoFile(e.target.files?.[0] || null)}
+                      className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-indigo-600 file:text-white file:font-bold file:text-xs hover:file:bg-indigo-500 cursor-pointer"
+                    />
+                    {isUploading && (
+                      <div className="mt-2 space-y-1">
+                        <div className="flex justify-between text-[10px] font-mono">
+                          <span>Uploading to S3...</span>
+                          <span>{uploadProgress}%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                          <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${uploadProgress}%` }} />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="w-full h-2 bg-indigo-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-indigo-600 rounded-full transition-all duration-200"
-                      style={{ width: `${uploadProgress}%` }}
+                ) : (
+                  <div>
+                    <input
+                      type="url"
+                      placeholder="https://robotics-lms-videos-processed-2026.s3.ap-southeast-2.amazonaws.com/.../hls/master.m3u8"
+                      value={newStageUrl}
+                      onChange={(e) => setNewStageUrl(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500 font-mono text-[11px]"
                     />
                   </div>
-                  <span className="text-[10px] text-indigo-700 block font-mono truncate">
-                    Target: s3://robotics-lms-videos-2026/projects/{targetProjectIdForModal}/{selectedVideoFile?.name}
-                  </span>
-                </div>
-              )}
-
-              {/* Video Title */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Video Stage / Lesson Title *
-                </label>
-                <input
-                  type="text"
-                  required
-                  disabled={isUploadingToS3}
-                  placeholder="e.g. Stage 3: Ultrasonic Spike Rejection & ROS2 Telemetry"
-                  value={stageTitle}
-                  onChange={(e) => setStageTitle(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-indigo-500"
-                />
+                )}
               </div>
 
-              {/* Duration in Minutes */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Duration (Minutes)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={180}
-                  disabled={isUploadingToS3}
-                  value={stageDuration}
-                  onChange={(e) => setStageDuration(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-indigo-500"
-                />
-              </div>
-
-              {/* BOM Hardware Parts */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Hardware Components Used in this Video (Comma-separated)
-                </label>
-                <input
-                  type="text"
-                  disabled={isUploadingToS3}
-                  placeholder="HC-SR04 Sonar, 1k Resistor, 2k Resistor, Jumper Wires"
-                  value={stageBOMText}
-                  onChange={(e) => setStageBOMText(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-indigo-500"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Build Instructions / Lesson Description
-                </label>
-                <textarea
-                  rows={2}
-                  disabled={isUploadingToS3}
-                  placeholder="Step-by-step soldering and wiring notes for this stage..."
-                  value={stageDesc}
-                  onChange={(e) => setStageDesc(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  disabled={isUploadingToS3}
-                  onClick={() => setShowAddStageModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isUploadingToS3}
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs transition shadow-sm flex items-center gap-1.5"
-                >
-                  {isUploadingToS3 ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Uploading to S3...</span>
-                    </>
-                  ) : (
-                    <>
-                      <UploadCloud className="w-3.5 h-3.5" />
-                      <span>Upload & Attach to Project</span>
-                    </>
-                  )}
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowAddStageModal(false)} className="px-4 py-2 bg-slate-100 rounded-lg font-bold">Cancel</button>
+                <button type="submit" disabled={isUploading} className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-lg disabled:opacity-50">
+                  {isUploading ? 'Uploading...' : 'Save Stage'}
                 </button>
               </div>
             </form>
@@ -1741,302 +1106,174 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* MODAL: EDIT EXISTING PROJECT VIDEO STAGE                  */}
-      {/* ========================================================= */}
-      {showEditStageModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 relative animate-fade-in max-h-[90vh] overflow-y-auto">
-            <button
-              type="button"
-              disabled={isUploadingToS3}
-              onClick={() => setShowEditStageModal(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center">
-                <Edit3 className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-extrabold text-slate-800">
-                  Edit Project Video Stage
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Upload a new video file to replace on S3 or update stage details.
-                </p>
-              </div>
+      {/* 4. Create Assignment Modal */}
+      {showCreateAssignmentModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 border border-slate-200 shadow-xl space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h4 className="font-extrabold text-sm text-slate-900">Create Hardware Assignment</h4>
+              <button onClick={() => setShowCreateAssignmentModal(false)} className="text-slate-400 font-bold text-sm">&times;</button>
             </div>
-
-            <form onSubmit={handleSaveEditedStage} className="space-y-4">
+            <form onSubmit={handleCreateAssignment} className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Video Stage Title
-                </label>
+                <label className="font-bold text-slate-700 block mb-1">Target Course*</label>
+                <select
+                  value={newAsgCourseId}
+                  onChange={(e) => setNewAsgCourseId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
+                >
+                  {projects.map((p) => (
+                    <option key={p.projectId} value={p.projectId}>{p.title}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Assignment Title*</label>
                 <input
                   type="text"
                   required
-                  disabled={isUploadingToS3}
-                  value={stageTitle}
-                  onChange={(e) => setStageTitle(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-sky-500"
+                  placeholder="e.g. HC-SR04 Voltage Divider Soldering Verification"
+                  value={newAsgTitle}
+                  onChange={(e) => setNewAsgTitle(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
                 />
               </div>
-
-              {/* Replace Video File or URL */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Replace Video File on S3 (Optional)
-                </label>
-                <input
-                  type="file"
-                  accept="video/*"
-                  disabled={isUploadingToS3}
-                  onChange={handleVideoFileChange}
-                  className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 cursor-pointer"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Current Video S3 Storage URL
-                </label>
-                <input
-                  type="url"
-                  required
-                  disabled={isUploadingToS3}
-                  value={stageVideoUrl}
-                  onChange={(e) => setStageVideoUrl(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:bg-white focus:border-sky-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Duration (Minutes)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={180}
-                  disabled={isUploadingToS3}
-                  value={stageDuration}
-                  onChange={(e) => setStageDuration(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-sky-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  BOM Components (Comma-separated)
-                </label>
-                <input
-                  type="text"
-                  disabled={isUploadingToS3}
-                  value={stageBOMText}
-                  onChange={(e) => setStageBOMText(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-sky-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  rows={2}
-                  disabled={isUploadingToS3}
-                  value={stageDesc}
-                  onChange={(e) => setStageDesc(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-sky-500"
-                />
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  disabled={isUploadingToS3}
-                  onClick={() => setShowEditStageModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isUploadingToS3}
-                  className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold text-xs transition shadow-sm"
-                >
-                  {isUploadingToS3 ? 'Uploading...' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* MODAL: CREATE NEW PROJECT KIT                             */}
-      {/* ========================================================= */}
-      {showCreateProjectModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 relative max-h-[90vh] overflow-y-auto animate-fade-in">
-            <button
-              type="button"
-              onClick={() => setShowCreateProjectModal(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
-                <PlusCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-extrabold text-slate-800">
-                  Create Hardware Kit Project
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Define a new robotics track with Bill of Materials and video stages.
-                </p>
-              </div>
-            </div>
-
-            <form onSubmit={handleCreateProject} className="space-y-3.5">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Project ID
-                  </label>
+                  <label className="font-bold text-slate-700 block mb-1">Due Date</label>
                   <input
-                    type="text"
-                    required
-                    placeholder="crs-drone-autopilot"
-                    value={newProjId}
-                    onChange={(e) => setNewProjId(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:bg-white focus:border-sky-500"
+                    type="date"
+                    value={newAsgDueDate}
+                    onChange={(e) => setNewAsgDueDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Category
-                  </label>
-                  <select
-                    value={newProjCategory}
-                    onChange={(e) => setNewProjCategory(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-sky-500"
-                  >
-                    <option value="Robotics">Robotics</option>
-                    <option value="Autonomous Vehicles">Autonomous Vehicles</option>
-                    <option value="IoT & Cloud">IoT & Cloud</option>
-                    <option value="Kinematics">Kinematics</option>
-                  </select>
+                  <label className="font-bold text-slate-700 block mb-1">Max Points</label>
+                  <input
+                    type="number"
+                    value={newAsgPoints}
+                    onChange={(e) => setNewAsgPoints(Number(e.target.value))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
                 </div>
               </div>
-
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Project Title
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Project 4: Autonomous Drone with PX4 & ROS2"
-                  value={newProjTitle}
-                  onChange={(e) => setNewProjTitle(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-sky-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Hardware Kit Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="AeroBot Quad Kit (STM32, Optical Flow, BLDC Motors)"
-                  value={newProjKit}
-                  onChange={(e) => setNewProjKit(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-sky-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Short Description
-                </label>
+                <label className="font-bold text-slate-700 block mb-1">Task Instructions</label>
                 <textarea
-                  rows={2}
-                  required
-                  placeholder="Build and program an autonomous quadcopter using flight controllers, ESCs, and telemetry."
-                  value={newProjDesc}
-                  onChange={(e) => setNewProjDesc(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-sky-500"
+                  rows={3}
+                  placeholder="Detailed build and testing instructions for the student..."
+                  value={newAsgDesc}
+                  onChange={(e) => setNewAsgDesc(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
                 />
               </div>
-
-              {/* Stage 1 Config */}
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                <span className="text-xs font-bold text-slate-800 block">
-                  Stage 1 Video & Hardware Configuration
-                </span>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    Stage 1 Title
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newProjStage1Title}
-                    onChange={(e) => setNewProjStage1Title(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    Video Stream URL (MP4 / HLS .m3u8)
-                  </label>
-                  <input
-                    type="url"
-                    required
-                    value={newProjStage1Video}
-                    onChange={(e) => setNewProjStage1Video(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    Bill of Materials (Comma-separated)
-                  </label>
-                  <input
-                    type="text"
-                    value={newProjStage1BOM}
-                    onChange={(e) => setNewProjStage1BOM(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
-                  />
-                </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowCreateAssignmentModal(false)} className="px-4 py-2 bg-slate-100 rounded-lg font-bold">Cancel</button>
+                <button type="submit" className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-lg">Create Assignment</button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-              <div className="pt-2 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateProjectModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800"
+      {/* 5. Grade Submission Modal */}
+      {gradingSubmission && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-slate-200 shadow-xl space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h4 className="font-extrabold text-sm text-slate-900">Grade Student Submission</h4>
+              <button onClick={() => setGradingSubmission(null)} className="text-slate-400 font-bold text-sm">&times;</button>
+            </div>
+            <div className="space-y-1">
+              <div className="font-bold text-slate-800">{gradingSubmission.studentName}</div>
+              <a href={gradingSubmission.submissionUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline text-[11px] font-mono break-all">
+                {gradingSubmission.submissionUrl}
+              </a>
+            </div>
+            <form onSubmit={handleSaveGrade} className="space-y-3">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Awarded Score (out of 100)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  required
+                  value={gradeScore}
+                  onChange={(e) => setGradeScore(Number(e.target.value))}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500 font-bold text-base"
+                />
+              </div>
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Mentor Feedback</label>
+                <textarea
+                  rows={3}
+                  placeholder="Provide technical feedback on the wiring or code implementation..."
+                  value={gradeFeedback}
+                  onChange={(e) => setGradeFeedback(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setGradingSubmission(null)} className="px-4 py-2 bg-slate-100 rounded-lg font-bold">Cancel</button>
+                <button type="submit" className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-lg">Save Grade</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Issue Certificate Modal */}
+      {showIssueCertModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-slate-200 shadow-xl space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h4 className="font-extrabold text-sm text-slate-900">Issue Verified Certificate</h4>
+              <button onClick={() => setShowIssueCertModal(false)} className="text-slate-400 font-bold text-sm">&times;</button>
+            </div>
+            <form onSubmit={handleIssueCertificate} className="space-y-3">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Select Student</label>
+                <select
+                  value={certStudentEmail}
+                  onChange={(e) => setCertStudentEmail(e.target.value)}
+                  required
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500 font-semibold"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition shadow-sm"
+                  <option value="">-- Choose Student --</option>
+                  {students.map((s) => (
+                    <option key={s.userId} value={s.email}>
+                      {s.name || s.email} ({s.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Select Course</label>
+                <select
+                  value={certCourseId}
+                  onChange={(e) => setCertCourseId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500 font-semibold"
                 >
-                  Publish Project Kit
-                </button>
+                  {projects.map((p) => (
+                    <option key={p.projectId} value={p.projectId}>{p.title}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Score Achieved (%)</label>
+                <input
+                  type="number"
+                  min="80"
+                  max="100"
+                  value={certScore}
+                  onChange={(e) => setCertScore(Number(e.target.value))}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500 font-bold"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowIssueCertModal(false)} className="px-4 py-2 bg-slate-100 rounded-lg font-bold">Cancel</button>
+                <button type="submit" className="px-5 py-2 bg-emerald-600 text-white font-bold rounded-lg">Issue Certificate</button>
               </div>
             </form>
           </div>

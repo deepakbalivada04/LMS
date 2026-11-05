@@ -144,6 +144,24 @@ export const userService = {
   },
 
   /**
+   * Generic user updater by userId or email
+   */
+  updateUser(userIdOrEmail: string, updates: Partial<UserRecord>): UserRecord {
+    const users = this.getAllUsers();
+    const clean = userIdOrEmail.toLowerCase().trim();
+    const index = users.findIndex((u) => u.userId === userIdOrEmail || u.email.toLowerCase() === clean);
+    if (index === -1) throw new Error('User not found');
+
+    const updated: UserRecord = {
+      ...users[index],
+      ...updates,
+    };
+    users[index] = updated;
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+    return updated;
+  },
+
+  /**
    * Admin assigns whole cluster pathways to a student (e.g. 'robot-kits', 'how-ai-thinks')
    */
   updateUserPathways(email: string, pathwayIds: string[]): UserRecord {
