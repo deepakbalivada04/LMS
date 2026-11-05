@@ -16,21 +16,77 @@ import {
   Eye, 
   Check, 
   PhoneCall, 
-  Bookmark, 
-  Calendar as CalendarIcon, 
-  Video, 
-  Bell, 
-  MessageCircle, 
-  Users, 
+  FileText,
   HelpCircle, 
   Send,
   ExternalLink,
   ChevronRight,
   Sparkles,
-  Inbox
+  CheckCircle2,
+  AlertCircle,
+  Cpu,
+  Layers,
+  Share2,
+  Calendar
 } from 'lucide-react';
 
-type TabType = 'courses' | 'calendar' | 'sessions' | 'notifications' | 'messages' | 'support' | 'peer_chat';
+type TabType = 'courses' | 'assignments' | 'quizzes' | 'certifications' | 'support';
+
+interface AssignmentItem {
+  id: string;
+  title: string;
+  courseTitle: string;
+  courseId: string;
+  dueDate: string;
+  points: number;
+  status: 'graded' | 'submitted' | 'due_soon' | 'pending';
+  grade?: string;
+  description: string;
+}
+
+const SAMPLE_ASSIGNMENTS: AssignmentItem[] = [
+  {
+    id: 'asg-1',
+    title: 'Dual Motor L298N Wiring & Common Ground Verification',
+    courseTitle: 'Autonomous Obstacle-Avoiding Rover Kit',
+    courseId: 'crs-esp32-rover',
+    dueDate: 'Nov 12, 2026',
+    points: 100,
+    status: 'graded',
+    grade: '96/100',
+    description: 'Verify wiring from ESP32 PWM pins to L298N motor driver inputs. Ensure LiPo GND is tied together with MCU GND.',
+  },
+  {
+    id: 'asg-2',
+    title: 'Ultrasonic Sonar Echo 3.3V Voltage Divider Protection',
+    courseTitle: 'Autonomous Obstacle-Avoiding Rover Kit',
+    courseId: 'crs-esp32-rover',
+    dueDate: 'Nov 16, 2026',
+    points: 100,
+    status: 'submitted',
+    description: 'Calculate and solder 1kΩ / 2kΩ resistor divider to step down HC-SR04 5V Echo pulse before it reaches GPIO 18.',
+  },
+  {
+    id: 'asg-3',
+    title: 'Obstacle Detection State Machine & Turn Trajectory Run',
+    courseTitle: 'Autonomous Obstacle-Avoiding Rover Kit',
+    courseId: 'crs-esp32-rover',
+    dueDate: 'Nov 20, 2026',
+    points: 100,
+    status: 'due_soon',
+    description: 'Record a 30-second continuous run of the rover detecting a wall at 20cm, executing reverse-turn, and resuming cruise.',
+  },
+  {
+    id: 'asg-4',
+    title: 'Multimeter Voltage Rail & Short Circuit Diagnostics',
+    courseTitle: 'Debugging a Robot That Won\'t Move',
+    courseId: 'skill-debugging-dead-robot',
+    dueDate: 'Nov 25, 2026',
+    points: 100,
+    status: 'pending',
+    description: 'Measure voltage drop across motor terminals under stall current. Record continuity beep checks across battery switches.',
+  },
+];
 
 export const StudentDashboard: React.FC = () => {
   const { user, isAdmin } = useAuth();
@@ -44,28 +100,20 @@ export const StudentDashboard: React.FC = () => {
 
   const [allProjects, setAllProjects] = useState<HardwareProject[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [simulateNewStudent, setSimulateNewStudent] = useState(false);
 
-  // Referral form state
-  const [referralName, setReferralName] = useState('');
-  const [referralEmail, setReferralEmail] = useState('');
-  const [referralPhone, setReferralPhone] = useState('');
-  const [referralCourse, setReferralCourse] = useState('Autonomous Robotics & AI Kit');
-  const [referralSuccess, setReferralSuccess] = useState(false);
+  // Assignment submission modal / state
+  const [submittingAssignmentId, setSubmittingAssignmentId] = useState<string | null>(null);
+  const [submissionUrl, setSubmissionUrl] = useState('');
+  const [submissionNotes, setSubmissionNotes] = useState('');
+  const [submittedIds, setSubmittedIds] = useState<string[]>([]);
 
-  // Doubt / Support ticket state
+  // Doubt ticket state
   const [doubtSubject, setDoubtSubject] = useState('');
   const [doubtCategory, setDoubtCategory] = useState('Hardware / Wiring');
   const [doubtMessage, setDoubtMessage] = useState('');
   const [doubtSubmitted, setDoubtSubmitted] = useState(false);
-
-  // Peer chat message state
-  const [chatMessages, setChatMessages] = useState([
-    { id: 1, author: 'Alex Chen', time: '10:14 AM', text: 'Has anyone tested the ESP32 L298N PWM frequency with 2S LiPo?', role: 'Student' },
-    { id: 2, author: 'Sannath Koushik', time: '10:20 AM', text: 'Recommend 1000Hz - 2000Hz on ledcSetup to prevent motor whine.', role: 'Lead Mentor' },
-    { id: 3, author: 'Priya Sharma', time: '11:05 AM', text: 'Obstacle avoidance sonar trigger pulse is running cleanly now! 🚀', role: 'Student' },
-  ]);
-  const [myChatInput, setMyChatInput] = useState('');
 
   // Course access request state for pending students
   const [accessRequested, setAccessRequested] = useState(false);
@@ -79,25 +127,25 @@ export const StudentDashboard: React.FC = () => {
     simulateNewStudent ? { email: 'simulated@newstudent.edu', role: 'student', enrolledProjectIds: [] } : user
   );
 
-  // Only show courses the student is authorized to view
   const displayCourses = realEnrolledProjects;
 
-  const filteredCourses = displayCourses.filter((p) =>
-    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredCourses = displayCourses.filter((p) => {
+    const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.category.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === 'ALL' || 
+      p.category.toLowerCase().replace(/[^a-z0-9]/g, '').includes(selectedCategory.toLowerCase().replace(/[^a-z0-9]/g, ''));
+    return matchesSearch && matchesCategory;
+  });
 
   const primaryProject = displayCourses[0];
 
-  const handleReferralSubmit = (e: React.FormEvent) => {
+  const handleAssignmentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setReferralSuccess(true);
-    setTimeout(() => {
-      setReferralName('');
-      setReferralEmail('');
-      setReferralPhone('');
-      setReferralSuccess(false);
-    }, 4000);
+    if (!submittingAssignmentId || !submissionUrl) return;
+    setSubmittedIds((prev) => [...prev, submittingAssignmentId]);
+    setSubmittingAssignmentId(null);
+    setSubmissionUrl('');
+    setSubmissionNotes('');
   };
 
   const handleDoubtSubmit = (e: React.FormEvent) => {
@@ -108,36 +156,20 @@ export const StudentDashboard: React.FC = () => {
       setDoubtSubject('');
       setDoubtMessage('');
       setDoubtSubmitted(false);
-    }, 4000);
-  };
-
-  const handleSendChat = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!myChatInput.trim()) return;
-    setChatMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        author: user?.name || 'You',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        text: myChatInput.trim(),
-        role: isAdmin ? 'Admin' : 'Student',
-      },
-    ]);
-    setMyChatInput('');
+    }, 4500);
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto py-2">
+    <div className="space-y-6 max-w-7xl mx-auto py-3">
       {/* ========================================================= */}
       {/* SUPER ADMIN TOOLBAR                                       */}
       {/* ========================================================= */}
       {isAdmin && (
-        <div className="p-3 rounded-xl bg-slate-900 border border-slate-700 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-semibold text-slate-300">
-              Admin Sandbox: Super Administrator portal active.
+        <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-semibold text-slate-200">
+              Admin Sandbox: Super Administrator privileges active.
             </span>
             <button
               type="button"
@@ -154,7 +186,7 @@ export const StudentDashboard: React.FC = () => {
           </div>
           <Link
             to="/admin"
-            className="py-1 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition"
+            className="py-1 px-3.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs"
           >
             <Shield className="w-3.5 h-3.5" />
             <span>Admin Console</span>
@@ -163,726 +195,660 @@ export const StudentDashboard: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 1. THE 4 HERO METRIC CARDS (EXACT INTELLIPAAT STYLE)      */}
+      {/* 1. ORIGINAL METRIC CARDS (NO COPYRIGHT / CLEAN SAAS DESIGN) */}
       {/* ========================================================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Courses To Do (Cyan to Violet Gradient) */}
-        <div className="bg-gradient-to-r from-[#00d2ff] via-[#4facfe] to-[#9254de] rounded-2xl p-5 text-white shadow-md relative overflow-hidden flex items-center justify-between">
-          <div>
-            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight drop-shadow-xs">
+        {/* Card 1: My Courses */}
+        <div 
+          onClick={() => setActiveTab('courses')}
+          className={`bg-white rounded-2xl p-5 border cursor-pointer transition-all hover:shadow-md ${
+            activeTab === 'courses' ? 'border-indigo-500 shadow-sm ring-1 ring-indigo-500/20' : 'border-slate-200/80 shadow-2xs'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Enrolled Courses
+            </span>
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <BookOpen className="w-5 h-5 stroke-[2.2]" />
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
               {displayCourses.length}
-            </div>
-            <div className="text-xs sm:text-sm font-bold mt-1 text-white/95">
-              Courses To Do
-            </div>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 border border-white/30">
-            <GraduationCap className="w-6 h-6 text-white" />
+            </span>
+            <span className="text-xs font-semibold text-emerald-600">
+              {displayCourses.length > 0 ? 'Active Curriculum' : 'Awaiting Batch'}
+            </span>
           </div>
         </div>
 
-        {/* Card 2: Assignment Overdue (Yellow to Orange Gradient) */}
-        <div className="bg-gradient-to-r from-[#ffd166] via-[#f59e0b] to-[#f97316] rounded-2xl p-5 text-white shadow-md relative overflow-hidden flex items-center justify-between">
-          <div>
-            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight drop-shadow-xs">
-              {displayCourses.length > 0 ? 39 : 0}
-            </div>
-            <div className="text-xs sm:text-sm font-bold mt-1 text-white/95">
-              Assignment Overdue
-            </div>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 border border-white/30">
-            <Clock className="w-6 h-6 text-white" />
-          </div>
-        </div>
-
-        {/* Card 3: Quiz Overdue (Mint to Cyan Gradient) */}
-        <div className="bg-gradient-to-r from-[#20bf6b] via-[#06d6a0] to-[#00b4d8] rounded-2xl p-5 text-white shadow-md relative overflow-hidden flex items-center justify-between">
-          <div>
-            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight drop-shadow-xs">
-              {displayCourses.length > 0 ? 7 : 0}
-            </div>
-            <div className="text-xs sm:text-sm font-bold mt-1 text-white/95">
-              Quiz Overdue
+        {/* Card 2: Assignments */}
+        <div 
+          onClick={() => setActiveTab('assignments')}
+          className={`bg-white rounded-2xl p-5 border cursor-pointer transition-all hover:shadow-md ${
+            activeTab === 'assignments' ? 'border-indigo-500 shadow-sm ring-1 ring-indigo-500/20' : 'border-slate-200/80 shadow-2xs'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Assignments
+            </span>
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <FileText className="w-5 h-5 stroke-[2.2]" />
             </div>
           </div>
-          <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 border border-white/30">
-            <Clock className="w-6 h-6 text-white" />
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
+              {SAMPLE_ASSIGNMENTS.length}
+            </span>
+            <span className="text-xs font-semibold text-amber-600">
+              1 Due This Week
+            </span>
           </div>
         </div>
 
-        {/* Card 4: Completed Course (Lime Green to Mint Gradient) */}
-        <div className="bg-gradient-to-r from-[#a3e635] via-[#22c55e] to-[#10b981] rounded-2xl p-5 text-white shadow-md relative overflow-hidden flex items-center justify-between">
-          <div>
-            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight drop-shadow-xs">
-              0
-            </div>
-            <div className="text-xs sm:text-sm font-bold mt-1 text-white/95">
-              Completed Course
+        {/* Card 3: Quizzes */}
+        <div 
+          onClick={() => setActiveTab('quizzes')}
+          className={`bg-white rounded-2xl p-5 border cursor-pointer transition-all hover:shadow-md ${
+            activeTab === 'quizzes' ? 'border-indigo-500 shadow-sm ring-1 ring-indigo-500/20' : 'border-slate-200/80 shadow-2xs'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Quizzes & Tests
+            </span>
+            <div className="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center">
+              <Layers className="w-5 h-5 stroke-[2.2]" />
             </div>
           </div>
-          <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 border border-white/30">
-            <Award className="w-6 h-6 text-white" />
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
+              {displayCourses.length > 0 ? displayCourses.length : 4}
+            </span>
+            <span className="text-xs font-semibold text-cyan-600">
+              Skills Evaluated
+            </span>
+          </div>
+        </div>
+
+        {/* Card 4: Certifications */}
+        <div 
+          onClick={() => setActiveTab('certifications')}
+          className={`bg-white rounded-2xl p-5 border cursor-pointer transition-all hover:shadow-md ${
+            activeTab === 'certifications' ? 'border-indigo-500 shadow-sm ring-1 ring-indigo-500/20' : 'border-slate-200/80 shadow-2xs'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Certifications
+            </span>
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Award className="w-5 h-5 stroke-[2.2]" />
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
+              1
+            </span>
+            <span className="text-xs font-semibold text-emerald-600">
+              Verified Certificate
+            </span>
           </div>
         </div>
       </div>
 
       {/* ========================================================= */}
-      {/* 2. INTELLIPAAT HORIZONTAL TEXT TABS ROW                   */}
+      {/* 2. THE 5 CLEAN NAVIGATION TABS                            */}
       {/* ========================================================= */}
-      <div className="flex items-center gap-4 sm:gap-6 border-b border-slate-200 overflow-x-auto text-xs font-semibold pt-1">
+      <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto text-xs font-semibold pt-1">
         <button
           type="button"
           onClick={() => setActiveTab('courses')}
-          className={`pb-3 px-1 transition-all whitespace-nowrap relative ${
+          className={`pb-3 px-4 transition-all whitespace-nowrap flex items-center gap-2 border-b-2 ${
             activeTab === 'courses'
-              ? 'text-[#7c3aed] font-extrabold border-b-2 border-[#7c3aed]'
-              : 'text-slate-500 hover:text-slate-900'
+              ? 'text-indigo-600 font-extrabold border-indigo-600'
+              : 'text-slate-500 border-transparent hover:text-slate-800'
           }`}
         >
-          My Courses
+          <BookOpen className="w-4 h-4" />
+          <span>My Courses</span>
+          {displayCourses.length > 0 && (
+            <span className="ml-1 px-1.5 py-0.2 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-mono font-bold">
+              {displayCourses.length}
+            </span>
+          )}
         </button>
 
         <button
           type="button"
-          onClick={() => setActiveTab('calendar')}
-          className={`pb-3 px-1 transition-all whitespace-nowrap ${
-            activeTab === 'calendar'
-              ? 'text-[#7c3aed] font-extrabold border-b-2 border-[#7c3aed]'
-              : 'text-slate-500 hover:text-slate-900'
+          onClick={() => setActiveTab('assignments')}
+          className={`pb-3 px-4 transition-all whitespace-nowrap flex items-center gap-2 border-b-2 ${
+            activeTab === 'assignments'
+              ? 'text-indigo-600 font-extrabold border-indigo-600'
+              : 'text-slate-500 border-transparent hover:text-slate-800'
           }`}
         >
-          Calendar
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('sessions')}
-          className={`pb-3 px-1 transition-all whitespace-nowrap ${
-            activeTab === 'sessions'
-              ? 'text-[#7c3aed] font-extrabold border-b-2 border-[#7c3aed]'
-              : 'text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          My Sessions
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('notifications')}
-          className={`pb-3 px-1 transition-all whitespace-nowrap flex items-center gap-1.5 ${
-            activeTab === 'notifications'
-              ? 'text-[#7c3aed] font-extrabold border-b-2 border-[#7c3aed]'
-              : 'text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          <span>Notifications</span>
-          <span className="w-4 h-4 rounded-full bg-[#7c3aed] text-white text-[10px] font-bold flex items-center justify-center">
-            35
+          <FileText className="w-4 h-4" />
+          <span>Assignments</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-700 text-[10px] font-mono font-bold">
+            {SAMPLE_ASSIGNMENTS.length}
           </span>
         </button>
 
         <button
           type="button"
-          onClick={() => setActiveTab('messages')}
-          className={`pb-3 px-1 transition-all whitespace-nowrap flex items-center gap-1.5 ${
-            activeTab === 'messages'
-              ? 'text-[#7c3aed] font-extrabold border-b-2 border-[#7c3aed]'
-              : 'text-slate-500 hover:text-slate-900'
+          onClick={() => setActiveTab('quizzes')}
+          className={`pb-3 px-4 transition-all whitespace-nowrap flex items-center gap-2 border-b-2 ${
+            activeTab === 'quizzes'
+              ? 'text-indigo-600 font-extrabold border-indigo-600'
+              : 'text-slate-500 border-transparent hover:text-slate-800'
           }`}
         >
-          <span>Messages</span>
-          <span className="w-4 h-4 rounded-full bg-slate-300 text-slate-700 text-[10px] font-bold flex items-center justify-center">
-            0
-          </span>
+          <Layers className="w-4 h-4" />
+          <span>Quizzes</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('certifications')}
+          className={`pb-3 px-4 transition-all whitespace-nowrap flex items-center gap-2 border-b-2 ${
+            activeTab === 'certifications'
+              ? 'text-indigo-600 font-extrabold border-indigo-600'
+              : 'text-slate-500 border-transparent hover:text-slate-800'
+          }`}
+        >
+          <Award className="w-4 h-4" />
+          <span>Certifications</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('support')}
-          className={`pb-3 px-1 transition-all whitespace-nowrap ${
+          className={`pb-3 px-4 transition-all whitespace-nowrap flex items-center gap-2 border-b-2 ${
             activeTab === 'support'
-              ? 'text-[#7c3aed] font-extrabold border-b-2 border-[#7c3aed]'
-              : 'text-slate-500 hover:text-slate-900'
+              ? 'text-indigo-600 font-extrabold border-indigo-600'
+              : 'text-slate-500 border-transparent hover:text-slate-800'
           }`}
         >
-          Support
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('peer_chat')}
-          className={`pb-3 px-1 transition-all whitespace-nowrap ${
-            activeTab === 'peer_chat'
-              ? 'text-[#7c3aed] font-extrabold border-b-2 border-[#7c3aed]'
-              : 'text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          Peer Chat
+          <HelpCircle className="w-4 h-4" />
+          <span>Support</span>
         </button>
       </div>
 
       {/* ========================================================= */}
-      {/* 3. DYNAMIC CONTENT AREA BASED ON ACTIVE TAB               */}
+      {/* 3. DYNAMIC CONTENT SECTION                                */}
       {/* ========================================================= */}
 
-      {/* TAB 1: MY COURSES (PRIMARY DUAL-COLUMN INTELLIPAAT VIEW) */}
+      {/* TAB 1: MY COURSES */}
       {activeTab === 'courses' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
-          {/* LEFT COLUMN: CURRICULUM, PROGRESS & COURSES LIST (68%) */}
-          <div className="lg:col-span-8 space-y-5">
-            
-            {/* Certificate Award Notification Card */}
-            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5">
-                <div className="text-3xl select-none">
-                  🎉
+        <div className="space-y-6">
+          {/* If No Courses Assigned Yet: Commercial LMS Pending State */}
+          {displayCourses.length === 0 ? (
+            <div className="bg-white rounded-2xl p-8 sm:p-12 border border-slate-200/90 shadow-2xs text-center space-y-6 max-w-2xl mx-auto">
+              <div className="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center mx-auto shadow-2xs">
+                <GraduationCap className="w-8 h-8" />
+              </div>
+
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-[11px] font-bold border border-amber-200/60">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Account Registered • Awaiting Course Allocation</span>
                 </div>
-                <div>
-                  <h4 className="font-extrabold text-sm text-slate-900">
-                    Congratulations! You've Earned Your Certificate
-                  </h4>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <Link
-                      to="/course/skill-assembling-first-robot/exam"
-                      className="text-xs font-semibold text-slate-600 hover:text-[#7c3aed] inline-flex items-center gap-1"
-                    >
-                      <span>Download Certificate</span>
-                      <Download className="w-3.5 h-3.5 text-slate-400" />
-                    </Link>
+                <h3 className="text-xl font-extrabold text-slate-900">
+                  Welcome to RoboLMS, {user?.name || 'Student'}!
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto">
+                  Your student passport has been created successfully. In our academy, specialized robotics courses and hardware kits are allocated directly by the Lead Administrator (<strong className="text-slate-700">sannathkoushik@gmail.com</strong>). Once approved, your assigned hardware projects, video stages, and exams will appear right here.
+                </p>
+              </div>
+
+              {/* Progress Steps */}
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 text-left text-xs space-y-3">
+                <div className="flex items-center gap-2.5 text-emerald-700 font-semibold">
+                  <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                    <Check className="w-3 h-3 stroke-[3]" />
                   </div>
+                  <span>Step 1: Student Account Registered</span>
+                </div>
+                <div className="flex items-center gap-2.5 text-amber-700 font-semibold">
+                  <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0 animate-pulse">
+                    <Clock className="w-3 h-3 stroke-[2.5]" />
+                  </div>
+                  <span>Step 2: Administrator Course Assignment (Awaiting Approval)</span>
+                </div>
+                <div className="flex items-center gap-2.5 text-slate-400 font-medium">
+                  <div className="w-5 h-5 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center shrink-0 text-[10px]">
+                    3
+                  </div>
+                  <span>Step 3: Access Hardware Videos, BOM & Lab Simulators</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 shrink-0">
-                <span className="text-[11px] text-slate-400">Share to:</span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    title="Share to WhatsApp"
-                    onClick={() => alert('Certificate share link copied!')}
-                    className="w-6 h-6 rounded-full bg-[#25d366]/20 text-[#25d366] flex items-center justify-center font-bold text-xs"
-                  >
-                    W
-                  </button>
-                  <button
-                    type="button"
-                    title="Share to LinkedIn"
-                    onClick={() => alert('Certificate share link copied!')}
-                    className="w-6 h-6 rounded-full bg-[#0a66c2]/20 text-[#0a66c2] flex items-center justify-center font-bold text-xs"
-                  >
-                    in
-                  </button>
-                  <button
-                    type="button"
-                    title="Share to X"
-                    onClick={() => alert('Certificate share link copied!')}
-                    className="w-6 h-6 rounded-full bg-slate-100 text-slate-800 flex items-center justify-center font-bold text-xs"
-                  >
-                    𝕏
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Sub Filter Row: MY COURSES & Search Bar */}
-            <div className="flex items-center justify-between gap-4 text-xs">
-              <div className="flex items-center gap-3">
-                <span className="font-extrabold text-slate-700 tracking-wider uppercase text-[11px]">
-                  MY COURSES ({displayCourses.length})
-                </span>
-                <span className="text-slate-300">|</span>
-                <span className="font-semibold text-slate-400 hover:text-slate-600 cursor-pointer text-[11px] uppercase">
-                  FELLOWSHIP
-                </span>
-              </div>
-
-              <div className="relative w-48 sm:w-60">
-                <input
-                  type="text"
-                  placeholder="Search courses..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-1.5 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:border-[#7c3aed]"
-                />
-                <Search className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-slate-400 pointer-events-none" />
-              </div>
-            </div>
-
-            {/* IF NO COURSES ASSIGNED YET: Pending Allocation Empty State */}
-            {displayCourses.length === 0 ? (
-              <div className="bg-white rounded-2xl p-8 border border-slate-200/90 shadow-2xs text-center space-y-5">
-                <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-500 border border-amber-200/60 flex items-center justify-center mx-auto shadow-2xs">
-                  <GraduationCap className="w-8 h-8" />
-                </div>
-
-                <div className="max-w-md mx-auto space-y-2">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>Account Active • Awaiting Course Allocation</span>
-                  </div>
-                  <h3 className="text-lg font-extrabold text-slate-900">
-                    Welcome to RoboLMS, {user?.name || 'Student'}!
-                  </h3>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Your student passport is successfully registered. Hardware courses and live lab kits are allocated directly by your Administrator (<strong className="text-slate-700">sannathkoushik@gmail.com</strong>). Once approved, your assigned hardware projects, video stages, and exams will appear here.
-                  </p>
-                </div>
-
-                {/* Progress Steps */}
-                <div className="max-w-lg mx-auto bg-slate-50 rounded-xl p-4 border border-slate-200 text-left text-xs space-y-2.5">
-                  <div className="flex items-center gap-2.5 text-emerald-700 font-semibold">
-                    <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-                      <Check className="w-3 h-3 stroke-[3]" />
-                    </div>
-                    <span>Step 1: Student Account Created</span>
-                  </div>
-                  <div className="flex items-center gap-2.5 text-amber-700 font-semibold">
-                    <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0 animate-pulse">
-                      <Clock className="w-3 h-3 stroke-[2.5]" />
-                    </div>
-                    <span>Step 2: Administrator Course Assignment (In Progress)</span>
-                  </div>
-                  <div className="flex items-center gap-2.5 text-slate-400 font-medium">
-                    <div className="w-5 h-5 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center shrink-0 text-[10px]">
-                      3
-                    </div>
-                    <span>Step 3: Access Hardware Videos, BOM & Lab Simulators</span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-                  {accessRequested ? (
-                    <div className="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold flex items-center gap-1.5">
-                      <Check className="w-4 h-4 stroke-[2.5]" />
-                      <span>Course Allocation Request Submitted!</span>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setAccessRequested(true)}
-                      className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-[#f59e0b] to-[#ea580c] hover:from-[#d97706] hover:to-[#c2410c] text-white font-bold text-xs rounded-lg transition shadow-xs"
-                    >
-                      Request Course Allocation
-                    </button>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('support')}
-                    className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition"
-                  >
-                    Contact Lead Mentor
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* "Continue where you left.." Card */}
-                <div className="space-y-2">
-                  <span className="text-xs font-bold text-slate-600 block">
-                    Continue where you left..
-                  </span>
-
-                  <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-12 h-12 rounded-xl bg-purple-50 text-[#7c3aed] flex items-center justify-center shrink-0 border border-purple-100">
-                        <Play className="w-5 h-5 fill-current ml-0.5" />
-                      </div>
-                      <div>
-                        <span className="inline-block px-2 py-0.5 rounded-full bg-purple-100 text-[#7c3aed] font-extrabold text-[10px] mb-1">
-                          {primaryProject ? primaryProject.category : 'Robotics Course'}
-                        </span>
-                        <h4 className="font-bold text-sm text-slate-900 leading-snug">
-                          {primaryProject ? primaryProject.title : 'Lecture 5 - Autonomous Obstacle Avoidance'}
-                        </h4>
-                      </div>
-                    </div>
-
-                    <Link
-                      to={`/course/${primaryProject?.projectId || 'skill-assembling-first-robot'}`}
-                      className="w-full sm:w-auto py-2 px-6 rounded-lg bg-[#8b5cf6] hover:bg-[#7c3aed] text-white font-bold text-xs inline-flex items-center justify-center gap-1 transition shadow-xs shrink-0"
-                    >
-                      <span>Continue &gt;</span>
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Program Header Card (Blue ribbon style) */}
-                <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-[#0ea5e9] text-white flex items-center justify-center shrink-0">
-                      <Bookmark className="w-4 h-4 fill-current" />
-                    </div>
-                    <h3 className="font-extrabold text-sm sm:text-base text-slate-900">
-                      Advanced Certification in Autonomous Robotics & AI Systems
-                    </h3>
-                  </div>
-
-                  <Link
-                    to={`/course/${primaryProject?.projectId || 'skill-assembling-first-robot'}`}
-                    className="w-full sm:w-auto py-2 px-5 rounded-lg bg-gradient-to-r from-[#f59e0b] to-[#ea580c] hover:from-[#d97706] hover:to-[#c2410c] text-white font-bold text-xs inline-flex items-center justify-center gap-1 transition shadow-xs shrink-0"
-                  >
-                    <span>Go To Program</span>
-                  </Link>
-                </div>
-
-                {/* List of Course Module Rows */}
-                <div className="space-y-3">
-                  {filteredCourses.map((project, idx) => {
-                    const prog = getCourseProgress(project.courseId);
-                    const isStarted = prog.completionPercentage > 0;
-                    const isFirst = idx === 0;
-
-                    return (
-                      <div
-                        key={project.projectId}
-                        className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition hover:border-slate-300"
-                      >
-                        <div className="flex items-start gap-3.5 flex-1 min-w-0">
-                          <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-500 flex items-center justify-center shrink-0 mt-0.5 border border-amber-200/60">
-                            <BookOpen className="w-4 h-4" />
-                          </div>
-
-                          <div className="flex-1 min-w-0 space-y-1.5">
-                            <h4 className="font-bold text-xs sm:text-sm text-slate-900 truncate">
-                              {project.title}
-                            </h4>
-
-                            <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
-                              <span>{isStarted ? `${prog.completedModules.length * 15} mins completed` : '0 mins completed'}</span>
-                              <span>&bull;</span>
-                              <span className="text-emerald-600 font-semibold">Update Available</span>
-                            </div>
-
-                            {/* Purple Progress Bar Track with Knob */}
-                            <div className="w-full max-w-xs relative py-1">
-                              <div className="w-full h-1 bg-purple-100 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-[#8b5cf6] rounded-full transition-all duration-300"
-                                  style={{ width: `${Math.max(prog.completionPercentage, isFirst ? 35 : 5)}%` }}
-                                />
-                              </div>
-                              <div
-                                className="w-2.5 h-2.5 rounded-full bg-[#7c3aed] border-2 border-white absolute top-0.5 shadow-2xs"
-                                style={{ left: `${Math.max(prog.completionPercentage, isFirst ? 35 : 5)}%` }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Right Action Button */}
-                        <div className="w-full sm:w-auto shrink-0 pt-2 sm:pt-0">
-                          {isStarted || isFirst ? (
-                            <Link
-                              to={`/course/${project.projectId}`}
-                              className="w-full sm:w-36 py-2 px-4 rounded-lg bg-gradient-to-r from-[#f59e0b] to-[#ea580c] hover:from-[#d97706] hover:to-[#c2410c] text-white font-bold text-xs inline-flex items-center justify-center gap-1 transition shadow-xs"
-                            >
-                              <span>Continue Course</span>
-                            </Link>
-                          ) : (
-                            <Link
-                              to={`/course/${project.projectId}`}
-                              className="w-full sm:w-36 py-2 px-4 rounded-lg border border-amber-400 text-amber-600 hover:bg-amber-50 font-bold text-xs inline-flex items-center justify-center gap-1 transition"
-                            >
-                              <span>Start Course</span>
-                            </Link>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* RIGHT COLUMN: REFERRAL & MENTOR CONNECT WIDGET (32%) */}
-          <div className="lg:col-span-4 space-y-5">
-            
-            {/* Referral Card (Exact IntelliPaat style with blue header & form) */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
-              {/* Dark Blue Hero Banner */}
-              <div className="bg-gradient-to-r from-[#1a237e] via-[#283593] to-[#3949ab] p-5 text-white flex items-center justify-between gap-3">
-                <div>
-                  <h4 className="font-extrabold text-sm sm:text-base leading-tight">
-                    Refer your friend and earn upto Rs. 5000/-
-                  </h4>
-                  <p className="text-[10px] text-blue-200 mt-1 font-mono">
-                    Guaranteed reward on enrollment
-                  </p>
-                </div>
-
-                {/* Smiling Avatar */}
-                <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-white/40 shrink-0 shadow-md">
-                  <img
-                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80"
-                    alt="Student"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
-
-              {/* Form */}
-              <div className="p-5">
-                {referralSuccess ? (
-                  <div className="py-6 text-center space-y-2 bg-emerald-50 rounded-xl p-4 border border-emerald-200">
-                    <div className="w-10 h-10 rounded-full bg-emerald-200 text-emerald-800 flex items-center justify-center mx-auto">
-                      <Check className="w-5 h-5 stroke-[3]" />
-                    </div>
-                    <h5 className="font-bold text-emerald-900 text-xs">Referral Sent!</h5>
-                    <p className="text-[11px] text-emerald-700">
-                      Your invitation has been sent to your friend. Reward unlocks upon enrollment.
-                    </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                {accessRequested ? (
+                  <div className="px-5 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-2">
+                    <Check className="w-4 h-4 stroke-[2.5]" />
+                    <span>Allocation Request Sent to sannathkoushik@gmail.com</span>
                   </div>
                 ) : (
-                  <form onSubmit={handleReferralSubmit} className="space-y-3 text-xs">
-                    <div>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Referral Full Name*"
-                        value={referralName}
-                        onChange={(e) => setReferralName(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-[#7c3aed]"
-                      />
-                    </div>
+                  <button
+                    type="button"
+                    onClick={() => setAccessRequested(true)}
+                    className="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition shadow-xs"
+                  >
+                    Request Course Allocation
+                  </button>
+                )}
 
-                    <div>
-                      <input
-                        type="email"
-                        required
-                        placeholder="Referral Email Id*"
-                        value={referralEmail}
-                        onChange={(e) => setReferralEmail(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-[#7c3aed]"
-                      />
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('support')}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
+                >
+                  Contact Lead Mentor
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Continue Learning Spotlight Hero Card */}
+              {primaryProject && (
+                <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white border border-slate-800 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
+                  <div className="space-y-2 relative z-10 max-w-xl">
+                    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-bold border border-indigo-400/30">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-300" />
+                      <span>Resume Your Active Hardware Lab</span>
                     </div>
+                    <h3 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
+                      {primaryProject.title}
+                    </h3>
+                    <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
+                      {primaryProject.description}
+                    </p>
+                    <div className="flex items-center gap-4 pt-1 text-xs text-slate-400 font-mono">
+                      <span>{primaryProject.modules?.length || 2} Video Stages</span>
+                      <span>&bull;</span>
+                      <span className="text-emerald-400 font-semibold">HLS Video Streaming Ready</span>
+                    </div>
+                  </div>
 
-                    <div className="flex gap-2">
-                      <div className="px-2.5 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-600 font-mono text-[11px] shrink-0 font-bold">
-                        +91 IN
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0 relative z-10 w-full md:w-auto">
+                    <Link
+                      to={`/course/${primaryProject.projectId}`}
+                      className="py-3 px-6 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-white font-extrabold text-xs inline-flex items-center justify-center gap-2 transition shadow-lg shadow-indigo-500/20"
+                    >
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>Continue Learning</span>
+                    </Link>
+                    <Link
+                      to={`/course/${primaryProject.projectId}/exam`}
+                      className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs inline-flex items-center justify-center gap-1.5 transition border border-slate-700"
+                    >
+                      <Layers className="w-4 h-4 text-cyan-400" />
+                      <span>Skill Quiz</span>
+                    </Link>
+                  </div>
+                </div>
+              )}
+
+              {/* Filters & Search Row */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs pt-1">
+                <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+                  {['ALL', 'Robot Kits', 'How AI Thinks', 'Space & Hardware', 'Prompting'].map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`px-3 py-1.5 rounded-lg font-bold transition text-xs whitespace-nowrap ${
+                        selectedCategory === cat
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="relative w-full sm:w-64">
+                  <input
+                    type="text"
+                    placeholder="Search allocated courses..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl pl-3 pr-8 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  />
+                  <Search className="w-3.5 h-3.5 absolute right-3 top-2.5 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Course Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {filteredCourses.map((project) => {
+                  const prog = getCourseProgress(project.courseId);
+                  const isStarted = prog.completionPercentage > 0;
+
+                  return (
+                    <div
+                      key={project.projectId}
+                      className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-md transition-all overflow-hidden flex flex-col"
+                    >
+                      {/* Top Header Strip */}
+                      <div className="p-5 pb-4 space-y-2 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-extrabold text-[10px] uppercase tracking-wide border border-indigo-100/80">
+                            {project.category}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400">
+                            {project.modules?.length || 1} Stages
+                          </span>
+                        </div>
+
+                        <h4 className="font-extrabold text-sm text-slate-900 leading-snug line-clamp-2">
+                          {project.title}
+                        </h4>
+
+                        <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                          {project.description}
+                        </p>
+
+                        {/* Progress Bar */}
+                        <div className="pt-3 space-y-1">
+                          <div className="flex items-center justify-between text-[11px] font-mono">
+                            <span className="text-slate-500 font-sans">Lab Progress</span>
+                            <span className="font-bold text-slate-900">{prog.completionPercentage}%</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-indigo-500 to-cyan-500 rounded-full transition-all duration-300"
+                              style={{ width: `${Math.max(prog.completionPercentage, 5)}%` }}
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <input
-                        type="tel"
-                        required
-                        placeholder="Mobile Number*"
-                        value={referralPhone}
-                        onChange={(e) => setReferralPhone(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-[#7c3aed]"
-                      />
+
+                      {/* Bottom Action Footer */}
+                      <div className="px-5 py-3.5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between gap-2">
+                        <Link
+                          to={`/course/${project.projectId}`}
+                          className="flex-1 py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs inline-flex items-center justify-center gap-1.5 transition shadow-xs"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <span>{isStarted ? 'Resume Lab' : 'Start Course'}</span>
+                        </Link>
+                        <Link
+                          to={`/course/${project.projectId}/exam`}
+                          className="py-2 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs inline-flex items-center justify-center transition"
+                          title="Take Quiz"
+                        >
+                          <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: ASSIGNMENTS */}
+      {activeTab === 'assignments' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-amber-500" />
+                  <span>Hands-on Hardware Lab Assignments</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Complete each practical hardware build milestone and submit your video verification or firmware link.
+                </p>
+              </div>
+              <div className="text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200/60 font-mono">
+                {SAMPLE_ASSIGNMENTS.length} Total Assignments
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3.5">
+            {SAMPLE_ASSIGNMENTS.map((asg) => {
+              const isSubmitted = submittedIds.includes(asg.id) || asg.status === 'submitted' || asg.status === 'graded';
+
+              return (
+                <div
+                  key={asg.id}
+                  className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition hover:border-slate-300"
+                >
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {asg.courseTitle}
+                      </span>
+                      {asg.status === 'graded' ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>Graded • {asg.grade}</span>
+                        </span>
+                      ) : isSubmitted ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-200 flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-cyan-600" />
+                          <span>Under Mentor Review</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 text-amber-600" />
+                          <span>Due: {asg.dueDate}</span>
+                        </span>
+                      )}
                     </div>
 
-                    <div>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Referral Course Name*"
-                        value={referralCourse}
-                        onChange={(e) => setReferralCourse(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-[#7c3aed]"
-                      />
-                    </div>
+                    <h4 className="font-extrabold text-sm text-slate-900">
+                      {asg.title}
+                    </h4>
 
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      {asg.description}
+                    </p>
+
+                    <div className="flex items-center gap-3 pt-1 text-[11px] text-slate-400 font-mono">
+                      <span>Max Points: {asg.points}</span>
+                      <span>&bull;</span>
+                      <span>Evaluation: Lead Mentor Sannath Koushik</span>
+                    </div>
+                  </div>
+
+                  <div className="w-full md:w-auto shrink-0">
+                    {asg.status === 'graded' ? (
+                      <div className="text-center md:text-right">
+                        <span className="text-xs font-bold text-emerald-600 block">Verified Pass</span>
+                        <span className="text-[11px] text-slate-400 font-mono">Score: {asg.grade}</span>
+                      </div>
+                    ) : isSubmitted ? (
+                      <div className="px-4 py-2 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold text-center">
+                        Submitted &bull; Awaiting Grade
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSubmittingAssignmentId(asg.id)}
+                        className="w-full md:w-auto px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs rounded-xl transition shadow-xs"
+                      >
+                        Submit Video Proof / Code
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Submission Modal */}
+          {submittingAssignmentId && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+              <div className="bg-white rounded-2xl max-w-lg w-full p-6 border border-slate-200 shadow-xl space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <h4 className="font-extrabold text-sm text-slate-900">
+                    Submit Assignment Proof
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setSubmittingAssignmentId(null)}
+                    className="text-slate-400 hover:text-slate-600 font-bold text-sm"
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                <form onSubmit={handleAssignmentSubmit} className="space-y-3.5 text-xs">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      Video Demonstration URL or GitHub Code Repository*
+                    </label>
+                    <input
+                      type="url"
+                      required
+                      placeholder="https://youtu.be/... or https://github.com/..."
+                      value={submissionUrl}
+                      onChange={(e) => setSubmissionUrl(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Upload an unlisted YouTube video showing the physical rover test or paste your GitHub firmware repo.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      Notes for Mentor (Optional)
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="e.g. Added a 100uF capacitor across the motor rail to smooth voltage spikes..."
+                      value={submissionNotes}
+                      onChange={(e) => setSubmissionNotes(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setSubmittingAssignmentId(null)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition"
+                    >
+                      Cancel
+                    </button>
                     <button
                       type="submit"
-                      className="w-full py-2.5 rounded-lg bg-gradient-to-r from-[#f59e0b] to-[#ea580c] hover:from-[#d97706] hover:to-[#c2410c] text-white font-extrabold text-xs tracking-wide transition shadow-xs"
+                      className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition shadow-xs"
                     >
-                      Send Message
+                      Submit for Evaluation
                     </button>
-
-                    <div className="flex items-start gap-1.5 pt-1 text-[10px] text-slate-400 leading-tight">
-                      <input type="checkbox" defaultChecked className="mt-0.5 rounded text-[#7c3aed]" />
-                      <span>
-                        By providing your contact details, you agree to our Terms of Use & Privacy Policy.
-                      </span>
-                    </div>
-                  </form>
-                )}
+                  </div>
+                </form>
               </div>
             </div>
-
-            {/* 24/7 Mentor Helpline Card */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs space-y-3">
-              <div className="flex items-center gap-2 text-slate-800 font-bold text-xs">
-                <PhoneCall className="w-4 h-4 text-[#7c3aed]" />
-                <span>Dedicated Mentor Doubt Support</span>
-              </div>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                Facing hardware wiring or microcontroller COM port connection errors? Mentors resolve queries in &lt; 45 mins.
-              </p>
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-400 font-sans text-[11px]">Email Lead Mentor:</span>
-                <a href="mailto:sannathkoushik@gmail.com" className="text-[#7c3aed] font-bold hover:underline">
-                  sannathkoushik@gmail.com
-                </a>
-              </div>
-            </div>
-
-          </div>
+          )}
         </div>
       )}
 
-      {/* TAB 2: CALENDAR */}
-      {activeTab === 'calendar' && (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-2xs space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-[#7c3aed]" />
-                <span>Hardware Lab & Masterclass Schedule</span>
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Upcoming live mentoring broadcasts, assignment hand-in milestones, and lab demos.
-              </p>
-            </div>
-            <div className="text-xs font-bold text-[#7c3aed] bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-100">
-              November 2026
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold">
-                <span className="text-[#ea580c] uppercase text-[10px] tracking-wide">Live Demo</span>
-                <span className="text-slate-500 font-mono">Nov 07 • 06:30 PM</span>
-              </div>
-              <h4 className="font-bold text-slate-800 text-sm">ESP32 PWM Motor Speed PID Tuning</h4>
-              <p className="text-xs text-slate-500">Live oscillogram measurements of motor back-EMF and noise suppression snubber diodes.</p>
-              <div className="pt-2 flex items-center justify-between text-xs">
-                <span className="text-[11px] text-slate-400">Mentor: Sannath Koushik</span>
-                <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[10px]">Registered</span>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold">
-                <span className="text-[#7c3aed] uppercase text-[10px] tracking-wide">Assignment Due</span>
-                <span className="text-slate-500 font-mono">Nov 10 • 11:59 PM</span>
-              </div>
-              <h4 className="font-bold text-slate-800 text-sm">Obstacle Avoidance FSM Submission</h4>
-              <p className="text-xs text-slate-500">Submit video recording of rover executing reverse-and-pivot upon sensing wall at 20cm.</p>
-              <div className="pt-2 flex items-center justify-between text-xs">
-                <span className="text-[11px] text-slate-400">Weight: 25%</span>
-                <span className="px-2 py-0.5 rounded bg-purple-100 text-[#7c3aed] font-bold text-[10px]">Pending</span>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold">
-                <span className="text-emerald-600 uppercase text-[10px] tracking-wide">Lab Test</span>
-                <span className="text-slate-500 font-mono">Nov 14 • 04:00 PM</span>
-              </div>
-              <h4 className="font-bold text-slate-800 text-sm">Robotic Arm Inverse Kinematics Exam</h4>
-              <p className="text-xs text-slate-500">Timed 45-minute online quiz with interactive Cartesian angle solver simulator.</p>
-              <div className="pt-2 flex items-center justify-between text-xs">
-                <span className="text-[11px] text-slate-400">Pass Mark: 80%</span>
-                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">Upcoming</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: MY SESSIONS */}
-      {activeTab === 'sessions' && (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-2xs space-y-6">
-          <div>
+      {/* TAB 3: QUIZZES */}
+      {activeTab === 'quizzes' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-2">
             <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-              <Video className="w-5 h-5 text-[#7c3aed]" />
-              <span>Live Masterclasses & Recorded Sessions</span>
+              <Layers className="w-5 h-5 text-cyan-600" />
+              <span>Skill Evaluation Quizzes & Knowledge Checks</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Access your real-time instructor sessions, Q&A office hours, and library recordings.
+              Timed interactive exams testing circuit wiring, firmware logic, and hardware debugging. Passing score is 80%.
             </p>
           </div>
 
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl border border-purple-200 bg-purple-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-[10px] font-bold animate-pulse">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
-                  <span>UPCOMING BROADCAST</span>
-                </div>
-                <h4 className="font-extrabold text-sm text-slate-900">
-                  Masterclass: ESP32 Hardware Integration & HLS Video Stream Optimization
-                </h4>
-                <p className="text-xs text-slate-500">
-                  Join Lead Mentor Sannath Koushik live for troubleshooting AWS MediaConvert pipeline, S3 CORS, and ESP32 camera streaming.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => alert('Launching live session room...')}
-                className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-[#f59e0b] to-[#ea580c] text-white font-bold text-xs rounded-lg shadow-xs hover:from-[#d97706] hover:to-[#c2410c] transition shrink-0"
-              >
-                Join Live Room
-              </button>
-            </div>
-
-            <div className="p-4 rounded-xl border border-slate-200 bg-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 font-mono">RECORDED REPLAY • 1h 14m</span>
-                <h4 className="font-bold text-sm text-slate-800">
-                  Session 4: Ultrasonic Sonar Echo Pin Voltage Divider for 3.3V ESP32
-                </h4>
-                <p className="text-xs text-slate-500">
-                  Detailed circuit protection explanation preventing 5V over-voltage damage to GPIO pins.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => alert('Opening recording player...')}
-                className="w-full sm:w-auto px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-50 font-bold text-xs rounded-lg transition shrink-0 flex items-center justify-center gap-1.5"
-              >
-                <Play className="w-3.5 h-3.5 fill-current text-[#7c3aed]" />
-                <span>Watch Replay</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: NOTIFICATIONS */}
-      {activeTab === 'notifications' && (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div>
-              <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                <Bell className="w-5 h-5 text-[#7c3aed]" />
-                <span>Activity & Academic Notifications (35)</span>
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Stay updated with grading feedback, newly unlocked stages, and lab kit dispatch notices.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => alert('All notifications marked as read')}
-              className="text-xs font-bold text-[#7c3aed] hover:underline"
-            >
-              Mark all as read
-            </button>
-          </div>
-
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
-              { title: 'New HLS Video Stage Available', desc: 'Stage 2: gemini generated video fac0cdb7 has been encoded with adaptive bitrate HLS streaming.', time: '10 mins ago', type: 'system' },
-              { title: 'Certificate Issued', desc: 'Your certificate for Assembling Your First Robot has been issued with serial #ROBO-CERT-2026.', time: '2 hours ago', type: 'award' },
-              { title: 'Assignment Reminder: Rover Obstacle Avoidance', desc: 'Your hardware video verification is due in 3 days. Ensure LiPo battery is fully charged.', time: '1 day ago', type: 'assignment' },
-              { title: 'Peer Discussion Reply', desc: 'Alex Chen replied to your thread in #hardware-debugging.', time: '2 days ago', type: 'peer' },
-            ].map((n, i) => (
-              <div key={i} className="p-3.5 rounded-xl border border-slate-200/90 hover:bg-slate-50 transition flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-purple-100 text-[#7c3aed] flex items-center justify-center shrink-0 mt-0.5">
-                  <Bell className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <h5 className="font-bold text-xs text-slate-900">{n.title}</h5>
-                    <span className="text-[10px] text-slate-400 font-mono shrink-0">{n.time}</span>
+              {
+                id: 'skill-assembling-first-robot',
+                title: 'Assembling Your First Robot: Wiring & Motor Fundamentals',
+                questions: 10,
+                timeMins: 15,
+                passMark: 80,
+                status: 'Passed (90%)',
+                category: 'Robot Kits',
+              },
+              {
+                id: 'skill-debugging-dead-robot',
+                title: 'Debugging a Robot That Won\'t Move: Continuity & Voltage Drops',
+                questions: 10,
+                timeMins: 15,
+                passMark: 80,
+                status: 'Ready to Take',
+                category: 'Space & Hardware',
+              },
+              {
+                id: 'crs-esp32-rover',
+                title: 'ESP32 Autonomous Obstacle-Avoidance Rover Quiz',
+                questions: 12,
+                timeMins: 20,
+                passMark: 80,
+                status: 'Ready to Take',
+                category: 'Robot Kits',
+              },
+              {
+                id: 'skill-how-rover-finds-its-way',
+                title: 'How a Rover Finds Its Way: Sonar & Sensor Fusion',
+                questions: 8,
+                timeMins: 10,
+                passMark: 80,
+                status: 'Ready to Take',
+                category: 'Space & Hardware',
+              },
+            ].map((quiz) => (
+              <div
+                key={quiz.id}
+                className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between gap-4 transition hover:border-slate-300"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-100">
+                      {quiz.category}
+                    </span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                      quiz.status.includes('Passed') 
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                        : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      {quiz.status}
+                    </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{n.desc}</p>
+
+                  <h4 className="font-extrabold text-sm text-slate-900 leading-snug">
+                    {quiz.title}
+                  </h4>
+
+                  <div className="flex items-center gap-3 text-xs text-slate-400 font-mono">
+                    <span>{quiz.questions} Questions</span>
+                    <span>&bull;</span>
+                    <span>{quiz.timeMins} Mins</span>
+                    <span>&bull;</span>
+                    <span className="text-slate-600 font-semibold">{quiz.passMark}% to Pass</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-[11px] text-slate-400 font-sans">Timed Multiple Choice</span>
+                  <Link
+                    to={`/course/${quiz.id}/exam`}
+                    className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs inline-flex items-center gap-1.5 transition shadow-xs"
+                  >
+                    <span>{quiz.status.includes('Passed') ? 'Retake Quiz' : 'Start Quiz'}</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
               </div>
             ))}
@@ -890,51 +856,84 @@ export const StudentDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 5: MESSAGES */}
-      {activeTab === 'messages' && (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-2xs space-y-4">
-          <div>
+      {/* TAB 4: CERTIFICATIONS */}
+      {activeTab === 'certifications' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-2">
             <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-              <Inbox className="w-5 h-5 text-[#7c3aed]" />
-              <span>Mentor & Instructor Direct Messages</span>
+              <Award className="w-5 h-5 text-emerald-600" />
+              <span>Official Hardware Lab Certifications</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Direct communication line with Lead Instructor Sannath Koushik.
+              Verified certificates issued upon completing practical build milestones and passing skill quizzes.
             </p>
           </div>
 
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#1a237e] text-white flex items-center justify-center font-bold text-sm">
-                SK
+          <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm max-w-3xl mx-auto space-y-6">
+            {/* Certificate Preview Card */}
+            <div className="border-4 border-double border-indigo-200 rounded-2xl p-6 sm:p-10 bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 text-center space-y-4 relative overflow-hidden shadow-xs">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-indigo-600 to-cyan-500 text-white flex items-center justify-center mx-auto shadow-md">
+                <Award className="w-7 h-7" />
               </div>
-              <div>
-                <h4 className="font-bold text-xs text-slate-900">Sannath Koushik (Lead Mentor)</h4>
-                <p className="text-[11px] text-emerald-600 font-medium">● Online • Ready to assist with hardware builds</p>
+
+              <div className="space-y-1">
+                <p className="text-[10px] font-mono tracking-widest uppercase text-slate-400 font-bold">
+                  FLYnBRD RoboLMS Academy &bull; Certificate of Mastery
+                </p>
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900">
+                  Autonomous Robotics & Hardware Systems
+                </h3>
+              </div>
+
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                This certifies that <strong className="text-slate-900">{user?.name || 'Koushik Sannath'}</strong> has demonstrated proficiency in microcontroller interfacing, PWM motor speed controllers, and sensor fusion.
+              </p>
+
+              <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-500">
+                <span>Credential ID: <strong className="text-slate-800">ROBO-CERT-2026-ESP32</strong></span>
+                <span>Issued: <strong className="text-slate-800">November 2026</strong></span>
+                <span className="text-emerald-600 font-bold flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Verified Authentic</span>
+                </span>
               </div>
             </div>
-            <a
-              href="mailto:sannathkoushik@gmail.com"
-              className="px-4 py-2 bg-[#7c3aed] text-white font-bold text-xs rounded-lg hover:bg-purple-700 transition"
-            >
-              Send Email
-            </a>
-          </div>
 
-          <div className="text-center py-8 text-xs text-slate-400 space-y-2">
-            <MessageCircle className="w-8 h-8 text-slate-300 mx-auto" />
-            <p>No unread mentor message threads. You are completely caught up!</p>
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                <Share2 className="w-4 h-4 text-slate-400" />
+                <span>Share Credential:</span>
+                <button
+                  type="button"
+                  onClick={() => alert('Certificate link copied to clipboard!')}
+                  className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition"
+                >
+                  Copy Link
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <Link
+                  to="/course/skill-assembling-first-robot/exam"
+                  className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl inline-flex items-center justify-center gap-2 transition shadow-xs"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download PDF Certificate</span>
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* TAB 6: SUPPORT & DOUBTS */}
+      {/* TAB 5: SUPPORT */}
       {activeTab === 'support' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <div className="lg:col-span-7 bg-white rounded-2xl p-6 border border-slate-200 shadow-2xs space-y-5">
+          <div className="lg:col-span-7 bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-5">
             <div>
               <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                <HelpCircle className="w-5 h-5 text-[#7c3aed]" />
+                <HelpCircle className="w-5 h-5 text-indigo-600" />
                 <span>Submit a Doubt or Hardware Ticket</span>
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -949,7 +948,7 @@ export const StudentDashboard: React.FC = () => {
                 </div>
                 <h4 className="font-extrabold text-sm text-emerald-900">Support Ticket Created!</h4>
                 <p className="text-xs text-emerald-700">
-                  Ticket reference #DOUBT-{Date.now().toString().slice(-5)} logged. Lead mentor Sannath Koushik will email you at {user?.email}.
+                  Ticket reference #ROBO-TKT-{Date.now().toString().slice(-5)} logged. Lead mentor Sannath Koushik will email you at {user?.email}.
                 </p>
               </div>
             ) : (
@@ -959,10 +958,10 @@ export const StudentDashboard: React.FC = () => {
                   <select
                     value={doubtCategory}
                     onChange={(e) => setDoubtCategory(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-[#7c3aed]"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
                   >
                     <option>Hardware / Wiring / Motor Driver</option>
-                    <option>ESP32 Firmware Flash / COM Port</option>
+                    <option>ESP32 Firmware Flash / COM Port Connection</option>
                     <option>S3 Video Streaming / HLS Playback</option>
                     <option>Course Allocation & Enrollment</option>
                     <option>Certification Exam Verification</option>
@@ -977,7 +976,7 @@ export const StudentDashboard: React.FC = () => {
                     placeholder="e.g. L298N motor driver heat sink getting warm on 2S battery"
                     value={doubtSubject}
                     onChange={(e) => setDoubtSubject(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#7c3aed]"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
@@ -989,13 +988,13 @@ export const StudentDashboard: React.FC = () => {
                     placeholder="Describe your wiring connections, supply voltage, and any error logs from the Arduino / ESP-IDF serial monitor..."
                     value={doubtMessage}
                     onChange={(e) => setDoubtMessage(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#7c3aed]"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 rounded-lg bg-gradient-to-r from-[#f59e0b] to-[#ea580c] hover:from-[#d97706] hover:to-[#c2410c] text-white font-extrabold text-xs transition shadow-xs"
+                  className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs transition shadow-xs"
                 >
                   Submit Ticket to Lead Mentor
                 </button>
@@ -1006,21 +1005,21 @@ export const StudentDashboard: React.FC = () => {
           <div className="lg:col-span-5 space-y-4">
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs space-y-3 text-xs">
               <h4 className="font-extrabold text-slate-900 flex items-center gap-2">
-                <PhoneCall className="w-4 h-4 text-[#7c3aed]" />
-                <span>Immediate Assistance</span>
+                <PhoneCall className="w-4 h-4 text-indigo-600" />
+                <span>Direct Lead Mentor Helpline</span>
               </h4>
               <p className="text-slate-500 leading-relaxed text-[11px]">
-                For urgent build issues during live workshops, you can reach out directly via:
+                Have questions about kit assembly or microcontroller pin multiplexing? Mentors answer directly:
               </p>
               <div className="space-y-2 pt-1 font-mono text-[11px]">
                 <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
                   <span className="text-slate-500 font-sans">Lead Mentor:</span>
-                  <a href="mailto:sannathkoushik@gmail.com" className="text-[#7c3aed] font-bold">
+                  <a href="mailto:sannathkoushik@gmail.com" className="text-indigo-600 font-bold hover:underline">
                     sannathkoushik@gmail.com
                   </a>
                 </div>
                 <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <span className="text-slate-500 font-sans">Support Hours:</span>
+                  <span className="text-slate-500 font-sans">Academy Lab:</span>
                   <span className="text-slate-800 font-bold">09:00 AM – 09:00 PM IST</span>
                 </div>
               </div>
@@ -1028,76 +1027,26 @@ export const StudentDashboard: React.FC = () => {
 
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs space-y-2 text-xs">
               <h4 className="font-extrabold text-slate-900">Frequently Asked Questions</h4>
-              <details className="cursor-pointer py-1 border-b border-slate-100">
-                <summary className="font-bold text-slate-700 hover:text-[#7c3aed]">How do I unlock additional courses?</summary>
+              <details className="cursor-pointer py-1.5 border-b border-slate-100">
+                <summary className="font-bold text-slate-700 hover:text-indigo-600">How do I unlock additional courses?</summary>
                 <p className="text-[11px] text-slate-500 pt-1">
-                  Once you enroll through the admissions portal, Administrator Sannath Koushik assigns the specific kit and course directly to your student email.
+                  Once you enroll in a new hardware batch, Administrator Sannath Koushik assigns the specific kit and course directly to your student email.
                 </p>
               </details>
-              <details className="cursor-pointer py-1 border-b border-slate-100">
-                <summary className="font-bold text-slate-700 hover:text-[#7c3aed]">Why does HLS video have adaptive quality?</summary>
+              <details className="cursor-pointer py-1.5 border-b border-slate-100">
+                <summary className="font-bold text-slate-700 hover:text-indigo-600">Why does HLS video have adaptive quality?</summary>
                 <p className="text-[11px] text-slate-500 pt-1">
                   Our AWS MediaConvert pipeline generates 1080p, 720p, and 480p streams automatically adjusting to your network speed.
                 </p>
               </details>
+              <details className="cursor-pointer py-1.5 border-b border-slate-100">
+                <summary className="font-bold text-slate-700 hover:text-indigo-600">What if my ESP32 COM port is not detected?</summary>
+                <p className="text-[11px] text-slate-500 pt-1">
+                  Install the CP2102 or CH340 USB-to-UART bridge driver from Silicon Labs / WCH, and ensure your USB cable supports data transfer.
+                </p>
+              </details>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* TAB 7: PEER CHAT / COMMUNITY */}
-      {activeTab === 'peer_chat' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden flex flex-col h-[520px]">
-          <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-[#7c3aed]/10 text-[#7c3aed] flex items-center justify-center">
-                <Users className="w-4 h-4" />
-              </div>
-              <div>
-                <h4 className="font-extrabold text-xs text-slate-900">RoboLMS Student Peer Lounge</h4>
-                <p className="text-[10px] text-emerald-600 font-medium">● 42 peers active in robotics discussions</p>
-              </div>
-            </div>
-            <span className="text-[10px] text-slate-400 font-mono">Channel: #hardware-builds</span>
-          </div>
-
-          <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50/40">
-            {chatMessages.map((msg) => (
-              <div key={msg.id} className="space-y-1">
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="font-bold text-slate-800">{msg.author}</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
-                    msg.role === 'Lead Mentor' || msg.role === 'Admin'
-                      ? 'bg-purple-100 text-[#7c3aed] font-bold'
-                      : 'bg-slate-200 text-slate-600'
-                  }`}>
-                    {msg.role}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono">{msg.time}</span>
-                </div>
-                <div className="bg-white p-3 rounded-xl border border-slate-200 text-xs text-slate-700 shadow-2xs max-w-xl">
-                  {msg.text}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <form onSubmit={handleSendChat} className="p-3 border-t border-slate-200 bg-white flex gap-2">
-            <input
-              type="text"
-              placeholder="Ask peers a question or share your rover build progress..."
-              value={myChatInput}
-              onChange={(e) => setMyChatInput(e.target.value)}
-              className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-[#7c3aed]"
-            />
-            <button
-              type="submit"
-              className="px-4 py-2 bg-[#7c3aed] hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shrink-0"
-            >
-              <span>Send</span>
-              <Send className="w-3.5 h-3.5" />
-            </button>
-          </form>
         </div>
       )}
     </div>
