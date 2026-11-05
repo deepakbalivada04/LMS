@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import loginBackdrop from '../../assets/login-backdrop.jpg';
+import companyLogo from '../../assets/text_logo.png';
 import { 
   Mail, 
   Lock, 
@@ -10,7 +11,6 @@ import {
   Eye, 
   EyeOff, 
   ShieldCheck, 
-  Cpu, 
   KeyRound,
   ArrowLeft,
   CheckCircle2
@@ -175,18 +175,12 @@ export const LoginPage: React.FC = () => {
         
         {/* Brand Header */}
         <div className="text-center mb-6">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white mx-auto shadow-md shadow-indigo-500/20 mb-3">
-            <Cpu className="w-6 h-6 stroke-[2.2]" />
-          </div>
-          <div className="flex items-center justify-center gap-1.5 leading-none">
-            <span className="text-2xl font-black tracking-tight text-slate-900">
-              Robo<span className="text-indigo-600">LMS</span>
-            </span>
-            <span className="px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-extrabold uppercase tracking-wide border border-indigo-100">
-              Academy
-            </span>
-          </div>
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono mt-1">
+          <img 
+            src={companyLogo} 
+            alt="Company Logo" 
+            className="h-12 sm:h-14 w-auto object-contain mx-auto mb-2"
+          />
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono">
             Hands-on Robotics & AI Learning Bench
           </p>
         </div>

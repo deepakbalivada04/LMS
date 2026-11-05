@@ -5,6 +5,7 @@ import { academicService, Assignment, AssignmentSubmission, Quiz, CertificateRec
 import { HardwareProject } from '../../types/course';
 import { useProgress } from '../../context/ProgressContext';
 import { useAuth } from '../../context/AuthContext';
+import companyLogo from '../../assets/text_logo.png';
 import { 
   GraduationCap, 
   Clock, 
@@ -825,13 +826,15 @@ export const StudentDashboard: React.FC = () => {
           ) : (
             <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm max-w-3xl mx-auto space-y-6">
               <div className="border-4 border-double border-indigo-200 rounded-2xl p-6 sm:p-10 bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 text-center space-y-4 relative overflow-hidden shadow-xs">
-                <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-indigo-600 to-cyan-500 text-white flex items-center justify-center mx-auto shadow-md">
-                  <Award className="w-7 h-7" />
-                </div>
+                <img 
+                  src={companyLogo} 
+                  alt="Company Logo" 
+                  className="h-10 sm:h-12 w-auto object-contain mx-auto mb-2"
+                />
 
                 <div className="space-y-1">
                   <p className="text-[10px] font-mono tracking-widest uppercase text-slate-400 font-bold">
-                    RoboLMS Academy &bull; Certificate of Mastery
+                    Official Academy &bull; Certificate of Mastery
                   </p>
                   <h3 className="text-xl sm:text-2xl font-black text-slate-900">
                     {primaryCert?.courseTitle || 'Autonomous Robotics & Hardware Systems'}

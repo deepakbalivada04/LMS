@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import companyLogo from '../../assets/text_logo.png';
 import { 
   Shield, 
   LogOut, 
   ChevronDown, 
   BookOpen,
-  Cpu,
   Award,
   HelpCircle,
   FileText
@@ -30,24 +30,13 @@ export const TopHeader: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           
-          {/* Left: Original Clean RoboLMS Brand Logo */}
+          {/* Left: Official Company Brand Logo */}
           <Link to="/dashboard" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-700 to-cyan-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
-              <Cpu className="w-5 h-5 stroke-[2.2]" />
-            </div>
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1.5 leading-none">
-                <span className="text-xl font-black tracking-tight text-slate-900 font-sans">
-                  Robo<span className="text-indigo-600">LMS</span>
-                </span>
-                <span className="px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-extrabold uppercase tracking-wide border border-indigo-100">
-                  Hardware
-                </span>
-              </div>
-              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider font-mono mt-0.5">
-                Robotics & AI Academy
-              </span>
-            </div>
+            <img 
+              src={companyLogo} 
+              alt="Company Logo" 
+              className="h-10 sm:h-11 w-auto object-contain transition-transform group-hover:scale-102"
+            />
           </Link>
 
           {/* Right: User Name, Admin Link, & Profile Dropdown */}

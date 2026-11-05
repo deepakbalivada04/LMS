@@ -9,6 +9,7 @@ import { videoUploadService } from '../../services/videoUploadService';
 import { UserRecord, UserRole, UserStatus } from '../../types/auth';
 import { HardwareProject, ProjectStage, ProjectCategory } from '../../types/course';
 import { HlsVideoPlayer } from '../../components/player/HlsVideoPlayer';
+import companyLogo from '../../assets/text_logo.png';
 import { 
   Shield, 
   Users, 
@@ -299,20 +300,24 @@ export const AdminDashboard: React.FC = () => {
       {/* TOP ADMIN HEADER BAR                                      */}
       {/* ========================================================= */}
       <div className="bg-slate-900 rounded-2xl p-6 text-white border border-slate-800 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[11px] font-mono tracking-widest uppercase text-emerald-400 font-bold">
-              Super Administrator Console
-            </span>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="p-2 rounded-xl bg-white/5 border border-white/10 shrink-0">
+            <img src={companyLogo} alt="Company Logo" className="h-10 w-auto object-contain" />
           </div>
-          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
-            <Cpu className="w-6 h-6 text-indigo-400" />
-            <span>RoboLMS Academy Control Hub</span>
-          </h2>
-          <p className="text-xs text-slate-400">
-            Live database sync: Manage students, allocate courses, upload S3 video stages, grade assignments, and issue certificates.
-          </p>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[11px] font-mono tracking-widest uppercase text-emerald-400 font-bold">
+                Super Administrator Console
+              </span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+              <span>Academy Control Hub</span>
+            </h2>
+            <p className="text-xs text-slate-400">
+              Live database sync: Manage students, allocate courses, upload S3 video stages, grade assignments, and issue certificates.
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
