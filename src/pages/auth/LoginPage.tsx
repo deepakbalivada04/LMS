@@ -3,13 +3,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import loginBackdrop from '../../assets/login-backdrop.jpg';
 import companyLogo from '../../assets/text_logo.png';
-import { 
-  Mail, 
-  Lock, 
-  User, 
-  ArrowRight, 
-  Eye, 
-  EyeOff, 
+import {
+  Mail,
+  Lock,
+  User,
+  ArrowRight,
+  Eye,
+  EyeOff,
   KeyRound,
   ArrowLeft,
   CheckCircle2
@@ -18,15 +18,15 @@ import {
 type AuthMode = 'signin' | 'signup' | 'confirm' | 'forgot_request' | 'forgot_confirm';
 
 export const LoginPage: React.FC = () => {
-  const { 
-    login, 
-    register, 
-    confirmRegistration, 
-    resendCode, 
-    forgotPassword, 
-    confirmForgotPassword 
+  const {
+    login,
+    register,
+    confirmRegistration,
+    resendCode,
+    forgotPassword,
+    confirmForgotPassword
   } = useAuth();
-  
+
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -155,11 +155,11 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 sm:p-6 overflow-hidden font-sans">
-      
+
       {/* ========================================================= */}
       {/* REALISTIC ROBOTICS MAKERSPACE CLASSROOM BACKGROUND        */}
       {/* ========================================================= */}
-      <div 
+      <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `url(${loginBackdrop})` }}
       />
@@ -170,42 +170,37 @@ export const LoginPage: React.FC = () => {
       {/* ========================================================= */}
       {/* SINGLE CLEAN AUTHENTICATION CARD                          */}
       {/* ========================================================= */}
-      <div className="w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/60 p-8 sm:p-10 relative z-10 text-slate-900 transition-all">
-        
+      <div className="w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/60 p-6 sm:p-8 pt-6 sm:pt-7 relative z-10 text-slate-900 transition-all">
+
         {/* Brand Header */}
-        <div className="text-center mb-6">
-          <img 
-            src={companyLogo} 
-            alt="Flynbrd Logo" 
-            className="h-16 sm:h-20 max-w-[240px] w-auto object-contain mx-auto mb-3 hover:scale-105 transition-transform"
+        <div className="text-center mb-5">
+          <img
+            src={companyLogo}
+            alt="Flynbrd Logo"
+            className="h-11 sm:h-12 w-auto max-w-[210px] object-contain mx-auto transition-transform"
           />
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono">
-            Hands-on Robotics & AI Learning Bench
-          </p>
         </div>
 
         {/* Tab Switcher: Sign In vs Create Account */}
         {(mode === 'signin' || mode === 'signup') && (
-          <div className="grid grid-cols-2 p-1 mb-6 rounded-2xl bg-slate-100 text-xs font-bold select-none">
+          <div className="grid grid-cols-2 p-1 mb-5 rounded-2xl bg-slate-100 text-xs font-bold select-none">
             <button
               type="button"
               onClick={() => { setMode('signin'); clearMessages(); }}
-              className={`py-2.5 rounded-xl transition-all ${
-                mode === 'signin'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
+              className={`py-2.5 rounded-xl transition-all ${mode === 'signin'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-500 hover:text-slate-900'
+                }`}
             >
               Sign In
             </button>
             <button
               type="button"
               onClick={() => { setMode('signup'); clearMessages(); }}
-              className={`py-2.5 rounded-xl transition-all ${
-                mode === 'signup'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
+              className={`py-2.5 rounded-xl transition-all ${mode === 'signup'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-500 hover:text-slate-900'
+                }`}
             >
               Create Account
             </button>
@@ -379,7 +374,7 @@ export const LoginPage: React.FC = () => {
               </button>
               <h4 className="font-extrabold text-sm text-slate-900">Reset Your Password</h4>
             </div>
-            
+
             <p className="text-slate-500 text-[11px] leading-relaxed">
               Enter the email address registered with your account. We will send you a 6-digit verification code to reset your password.
             </p>
