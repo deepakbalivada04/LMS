@@ -10,19 +10,24 @@ import {
   Eye, 
   EyeOff, 
   ShieldCheck, 
-  RefreshCw, 
   Cpu, 
-  Bot, 
-  Code2, 
-  Sparkles,
-  Award,
-  Layers
+  KeyRound,
+  ArrowLeft,
+  CheckCircle2
 } from 'lucide-react';
 
-type AuthMode = 'signin' | 'signup' | 'confirm';
+type AuthMode = 'signin' | 'signup' | 'confirm' | 'forgot_request' | 'forgot_confirm';
 
 export const LoginPage: React.FC = () => {
-  const { login, register, confirmRegistration, resendCode } = useAuth();
+  const { 
+    login, 
+    register, 
+    confirmRegistration, 
+    resendCode, 
+    forgotPassword, 
+    confirmForgotPassword 
+  } = useAuth();
+  
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -31,6 +36,7 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -39,9 +45,14 @@ export const LoginPage: React.FC = () => {
 
   const from = (location.state as any)?.from?.pathname || '/dashboard';
 
+  const clearMessages = () => {
+    setError(null);
+    setSuccessMessage(null);
+  };
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    clearMessages();
     setIsLoading(true);
     try {
       await login(email, password);
@@ -63,7 +74,7 @@ export const LoginPage: React.FC = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    clearMessages();
     setIsLoading(true);
     try {
       const result = await register({ email, password, name, role: 'student' });
@@ -83,7 +94,7 @@ export const LoginPage: React.FC = () => {
 
   const handleConfirmCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    clearMessages();
     setIsLoading(true);
     try {
       await confirmRegistration(email, verificationCode);
@@ -96,8 +107,45 @@ export const LoginPage: React.FC = () => {
     }
   };
 
+  const handleForgotRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      setError('Please enter your account email.');
+      return;
+    }
+    clearMessages();
+    setIsLoading(true);
+    try {
+      await forgotPassword(email);
+      setSuccessMessage(`A password reset code has been sent to ${email}`);
+      setMode('forgot_confirm');
+    } catch (err: any) {
+      setError(err?.message || 'Failed to request password reset. Check if email is registered.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotConfirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    clearMessages();
+    setIsLoading(true);
+    try {
+      await confirmForgotPassword(email, verificationCode, newPassword);
+      setSuccessMessage('Password reset successfully! You can now sign in with your new password.');
+      setMode('signin');
+      setPassword('');
+      setNewPassword('');
+      setVerificationCode('');
+    } catch (err: any) {
+      setError(err?.message || 'Failed to reset password. Please verify the code.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleResend = async () => {
-    setError(null);
+    clearMessages();
     try {
       await resendCode(email);
       setSuccessMessage('A new verification code has been dispatched to your email.');
@@ -107,356 +155,394 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 sm:p-6 lg:p-10 overflow-hidden font-sans">
+    <div className="min-h-screen relative flex items-center justify-center p-4 sm:p-6 overflow-hidden font-sans">
       
       {/* ========================================================= */}
-      {/* FULL-PAGE IMMERSIVE REALISTIC ROBOTICS LAB BACKDROP       */}
+      {/* REALISTIC ROBOTICS MAKERSPACE CLASSROOM BACKGROUND        */}
       {/* ========================================================= */}
       <div 
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat scale-100 transition-all duration-1000"
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `url(${loginBackdrop})` }}
       />
 
-      {/* Atmospheric Soft Dark Gradient Overlay to ensure full visibility and high contrast */}
-      <div className="fixed inset-0 bg-gradient-to-r from-slate-950/75 via-slate-950/60 to-slate-900/70 backdrop-blur-[2px]" />
-
-      {/* Ambient subtle glow lights */}
-      <div className="absolute top-10 left-10 w-96 h-96 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-96 h-96 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
+      {/* Gentle Atmospheric Overlay so children working on robotics are clearly visible */}
+      <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-[1.5px]" />
 
       {/* ========================================================= */}
-      {/* MAIN DUAL-COLUMN AUTHENTIC AUTH CARD                      */}
+      {/* SINGLE CLEAN AUTHENTICATION CARD                          */}
       {/* ========================================================= */}
-      <div className="w-full max-w-5xl bg-slate-950/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden grid grid-cols-1 lg:grid-cols-12 relative z-10 text-white">
+      <div className="w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/60 p-8 sm:p-10 relative z-10 text-slate-900 transition-all">
         
-        {/* ======================================================= */}
-        {/* LEFT COLUMN: HERO SHOWCASE (CHILDREN IN ROBOTICS LAB)   */}
-        {/* ======================================================= */}
-        <div className="lg:col-span-5 relative p-8 sm:p-10 flex flex-col justify-between overflow-hidden min-h-[560px] border-b lg:border-b-0 lg:border-r border-white/10">
-          
-          {/* Subtle inside background preview */}
-          <div 
-            className="absolute inset-0 bg-cover bg-center opacity-30 mix-blend-luminosity scale-110"
-            style={{ backgroundImage: `url(${loginBackdrop})` }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/85 to-indigo-950/40" />
-
-          {/* Top Brand Logo */}
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-500 to-cyan-400 p-0.5 shadow-lg shadow-indigo-500/30 flex items-center justify-center">
-                <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-cyan-400">
-                  <Cpu className="w-5 h-5 stroke-[2.2]" />
-                </div>
-              </div>
-              <div>
-                <span className="font-black text-xl tracking-tight text-white block leading-none">
-                  Robo<span className="text-cyan-400">LMS</span>
-                </span>
-                <span className="text-[10px] text-slate-300 uppercase tracking-widest font-mono font-bold mt-1 block">
-                  Robotics & AI Academy
-                </span>
-              </div>
-            </div>
-
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-[11px] font-bold mb-4 backdrop-blur-md">
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Grades 3–10 Hands-on Robotics & STEM</span>
-            </div>
-
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight mb-3 text-white">
-              Build Real Robots.<br />
-              Code from Day One.
-            </h2>
-
-            <p className="text-xs text-slate-300 leading-relaxed mb-6 font-medium">
-              Join young innovators building multi-axis robotic arms, programming autonomous obstacle-avoidance rovers, and learning embedded sensor wiring with friendly visual block coding.
-            </p>
-
-            {/* Feature Highlights */}
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-3 bg-white/5 backdrop-blur-md p-3 rounded-2xl border border-white/10">
-                <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
-                  <Bot className="w-4 h-4" />
-                </div>
-                <div>
-                  <h5 className="text-xs font-bold text-white">Robotic Arm & Rover Kits</h5>
-                  <p className="text-[10px] text-slate-400">Hands-on assembly with ESP32 & TT motors</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 bg-white/5 backdrop-blur-md p-3 rounded-2xl border border-white/10">
-                <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
-                  <Code2 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h5 className="text-xs font-bold text-white">Visual Block Coding & C++</h5>
-                  <p className="text-[10px] text-slate-400">Learn algorithms with live hardware feedback</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 bg-white/5 backdrop-blur-md p-3 rounded-2xl border border-white/10">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                  <Award className="w-4 h-4" />
-                </div>
-                <div>
-                  <h5 className="text-xs font-bold text-white">Certified Hardware Mastery</h5>
-                  <p className="text-[10px] text-slate-400">Earn verified diplomas upon lab completion</p>
-                </div>
-              </div>
-            </div>
+        {/* Brand Header */}
+        <div className="text-center mb-6">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white mx-auto shadow-md shadow-indigo-500/20 mb-3">
+            <Cpu className="w-6 h-6 stroke-[2.2]" />
           </div>
-
-          {/* Bottom Trust Badge */}
-          <div className="pt-6 relative z-10 flex items-center justify-between border-t border-white/10 text-xs text-slate-400">
-            <span className="flex items-center gap-1.5 font-medium text-slate-300">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              AWS Cloud Live
+          <div className="flex items-center justify-center gap-1.5 leading-none">
+            <span className="text-2xl font-black tracking-tight text-slate-900">
+              Robo<span className="text-indigo-600">LMS</span>
             </span>
-            <span className="text-[10px] font-mono text-cyan-400">
-              Cognito Secured
+            <span className="px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-extrabold uppercase tracking-wide border border-indigo-100">
+              Academy
             </span>
           </div>
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono mt-1">
+            Hands-on Robotics & AI Learning Bench
+          </p>
         </div>
 
-        {/* ======================================================= */}
-        {/* RIGHT COLUMN: CLEAN STUDENT SIGN IN / REGISTER FORM     */}
-        {/* ======================================================= */}
-        <div className="lg:col-span-7 p-8 sm:p-12 flex flex-col justify-center bg-white text-slate-900">
-          
-          {/* Header */}
-          <div className="mb-6">
-            <h3 className="text-2xl font-black text-slate-900 tracking-tight">
-              {mode === 'signin' && 'Welcome Back, Innovator!'}
-              {mode === 'signup' && 'Create Student Account'}
-              {mode === 'confirm' && 'Verify Your Email'}
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              {mode === 'signin' && 'Sign in with your registered email to access your hardware workbench.'}
-              {mode === 'signup' && 'Register your student passport to begin hands-on robotics courses.'}
-              {mode === 'confirm' && `Enter the 6-digit verification code sent to ${email}`}
-            </p>
+        {/* Tab Switcher: Sign In vs Create Account */}
+        {(mode === 'signin' || mode === 'signup') && (
+          <div className="grid grid-cols-2 p-1 mb-6 rounded-2xl bg-slate-100 text-xs font-bold select-none">
+            <button
+              type="button"
+              onClick={() => { setMode('signin'); clearMessages(); }}
+              className={`py-2.5 rounded-xl transition-all ${
+                mode === 'signin'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('signup'); clearMessages(); }}
+              className={`py-2.5 rounded-xl transition-all ${
+                mode === 'signup'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Create Account
+            </button>
           </div>
+        )}
 
-          {/* Tabs: Sign In vs Create Account */}
-          {mode !== 'confirm' && (
-            <div className="grid grid-cols-2 p-1 mb-6 rounded-2xl bg-slate-100 text-xs font-bold select-none">
-              <button
-                type="button"
-                onClick={() => { setMode('signin'); setError(null); }}
-                className={`py-2.5 rounded-xl transition-all ${
-                  mode === 'signin'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMode('signup'); setError(null); }}
-                className={`py-2.5 rounded-xl transition-all ${
-                  mode === 'signup'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                Create Account
-              </button>
+        {/* Feedback Messages */}
+        {error && (
+          <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-rose-600 shrink-0" />
+            <span className="flex-1">{error}</span>
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="flex-1">{successMessage}</span>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* VIEW 1: SIGN IN FORM                                      */}
+        {/* ========================================================= */}
+        {mode === 'signin' && (
+          <form onSubmit={handleSignIn} className="space-y-4 text-xs">
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">Student / Admin Email</label>
+              <div className="relative">
+                <input
+                  type="email"
+                  required
+                  placeholder="student@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-600 font-medium"
+                />
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+              </div>
             </div>
-          )}
 
-          {/* Feedback Alerts */}
-          {error && (
-            <div className="mb-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-rose-600 shrink-0" />
-              <span>{error}</span>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-bold text-slate-700">Password</label>
+                <button
+                  type="button"
+                  onClick={() => { setMode('forgot_request'); clearMessages(); }}
+                  className="text-indigo-600 hover:text-indigo-700 font-bold hover:underline text-[11px]"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  placeholder="••••••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-10 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-600 font-medium"
+                />
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
-          )}
 
-          {successMessage && (
-            <div className="mb-4 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-600 shrink-0" />
-              <span>{successMessage}</span>
-            </div>
-          )}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+            >
+              {isLoading ? (
+                <span>Signing In...</span>
+              ) : (
+                <>
+                  <span>Sign In to Learning Bench</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
+        )}
 
-          {/* Sign In Form */}
-          {mode === 'signin' && (
-            <form onSubmit={handleSignIn} className="space-y-4 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Student / Admin Email</label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    required
-                    placeholder="student@example.com or sannathkoushik@gmail.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-600 font-medium"
-                  />
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Password</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    placeholder="••••••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-10 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-600 font-medium"
-                  />
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
-              >
-                {isLoading ? (
-                  <span>Authenticating...</span>
-                ) : (
-                  <>
-                    <span>Sign In to Learning Bench</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-
-          {/* Sign Up Form */}
-          {mode === 'signup' && (
-            <form onSubmit={handleSignUp} className="space-y-4 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Student Full Name</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Aryan Sharma"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-600 font-medium"
-                  />
-                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Email Address</label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    required
-                    placeholder="student@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-600 font-medium"
-                  />
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Password (Min 8 chars, 1 number, 1 uppercase)</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    placeholder="Create a strong password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-10 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-600 font-medium"
-                  />
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
-              >
-                {isLoading ? (
-                  <span>Registering...</span>
-                ) : (
-                  <>
-                    <span>Create Student Account</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-
-          {/* Confirm Code Form */}
-          {mode === 'confirm' && (
-            <form onSubmit={handleConfirmCode} className="space-y-4 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">6-Digit Verification Code</label>
+        {/* ========================================================= */}
+        {/* VIEW 2: CREATE STUDENT ACCOUNT                            */}
+        {/* ========================================================= */}
+        {mode === 'signup' && (
+          <form onSubmit={handleSignUp} className="space-y-4 text-xs">
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">Student Full Name</label>
+              <div className="relative">
                 <input
                   type="text"
                   required
-                  placeholder="123456"
-                  maxLength={6}
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-600 text-center text-lg font-mono tracking-widest font-bold"
+                  placeholder="e.g. Aryan Sharma"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-600 font-medium"
                 />
+                <User className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
               </div>
+            </div>
 
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">Email Address</label>
+              <div className="relative">
+                <input
+                  type="email"
+                  required
+                  placeholder="student@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-600 font-medium"
+                />
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+              </div>
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">
+                Password (Min 8 chars, 1 uppercase, 1 number)
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  placeholder="Create password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-10 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-600 font-medium"
+                />
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+            >
+              {isLoading ? <span>Registering...</span> : <span>Create Student Account</span>}
+            </button>
+          </form>
+        )}
+
+        {/* ========================================================= */}
+        {/* VIEW 3: FORGOT PASSWORD (STEP 1: REQUEST CODE)             */}
+        {/* ========================================================= */}
+        {mode === 'forgot_request' && (
+          <form onSubmit={handleForgotRequest} className="space-y-4 text-xs">
+            <div className="flex items-center gap-2 mb-2">
               <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                type="button"
+                onClick={() => { setMode('signin'); clearMessages(); }}
+                className="p-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100"
               >
-                {isLoading ? <span>Verifying...</span> : <span>Confirm & Sign In</span>}
+                <ArrowLeft className="w-4 h-4" />
               </button>
+              <h4 className="font-extrabold text-sm text-slate-900">Reset Your Password</h4>
+            </div>
+            
+            <p className="text-slate-500 text-[11px] leading-relaxed">
+              Enter the email address registered with your account. We will send you a 6-digit verification code to reset your password.
+            </p>
 
-              <div className="flex items-center justify-between pt-2">
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">Account Email</label>
+              <div className="relative">
+                <input
+                  type="email"
+                  required
+                  placeholder="student@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-600 font-medium"
+                />
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isLoading ? <span>Sending Code...</span> : <span>Send Reset Code</span>}
+            </button>
+
+            <div className="text-center pt-2">
+              <button
+                type="button"
+                onClick={() => { setMode('signin'); clearMessages(); }}
+                className="text-slate-500 hover:text-slate-900 font-bold"
+              >
+                Back to Sign In
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ========================================================= */}
+        {/* VIEW 4: FORGOT PASSWORD (STEP 2: CONFIRM NEW PASSWORD)     */}
+        {/* ========================================================= */}
+        {mode === 'forgot_confirm' && (
+          <form onSubmit={handleForgotConfirm} className="space-y-4 text-xs">
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => { setMode('forgot_request'); clearMessages(); }}
+                className="p-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <h4 className="font-extrabold text-sm text-slate-900">Enter Reset Code</h4>
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">6-Digit Reset Code</label>
+              <input
+                type="text"
+                required
+                placeholder="123456"
+                maxLength={6}
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-center font-mono text-base font-bold tracking-widest focus:outline-none focus:bg-white focus:border-indigo-600"
+              />
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">New Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  placeholder="Enter new password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-10 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-600 font-medium"
+                />
+                <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
                 <button
                   type="button"
-                  onClick={handleResend}
-                  className="text-indigo-600 font-bold hover:underline"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
                 >
-                  Resend verification code
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode('signin')}
-                  className="text-slate-500 font-bold hover:underline"
-                >
-                  Back to Sign In
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-            </form>
-          )}
+            </div>
 
-          <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Commercial LMS Access Protected</span>
-            <span className="font-mono text-slate-500">v2.4 &bull; 2026</span>
-          </div>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isLoading ? <span>Updating Password...</span> : <span>Reset Password & Sign In</span>}
+            </button>
+          </form>
+        )}
+
+        {/* ========================================================= */}
+        {/* VIEW 5: EMAIL CONFIRMATION CODE                            */}
+        {/* ========================================================= */}
+        {mode === 'confirm' && (
+          <form onSubmit={handleConfirmCode} className="space-y-4 text-xs">
+            <h4 className="font-extrabold text-sm text-slate-900">Verify Your Email</h4>
+            <p className="text-slate-500 text-[11px]">
+              Enter the 6-digit confirmation code dispatched to <strong>{email}</strong>
+            </p>
+
+            <div>
+              <input
+                type="text"
+                required
+                placeholder="123456"
+                maxLength={6}
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 text-center font-mono text-lg font-bold tracking-widest focus:outline-none focus:bg-white focus:border-indigo-600"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isLoading ? <span>Verifying...</span> : <span>Confirm & Activate Account</span>}
+            </button>
+
+            <div className="flex items-center justify-between pt-2 text-[11px]">
+              <button
+                type="button"
+                onClick={handleResend}
+                className="text-indigo-600 font-bold hover:underline"
+              >
+                Resend code
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMode('signin'); clearMessages(); }}
+                className="text-slate-500 font-bold hover:underline"
+              >
+                Back to Sign In
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Trust Badges */}
+        <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+          <span className="flex items-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Amazon Cognito Protected</span>
+          </span>
+          <span className="font-mono text-slate-500">AWS Cloud</span>
         </div>
 
       </div>

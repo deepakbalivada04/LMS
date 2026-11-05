@@ -4,6 +4,8 @@ import {
   signUp as amplifySignUp, 
   confirmSignUp as amplifyConfirmSignUp, 
   resendSignUpCode as amplifyResendSignUpCode,
+  resetPassword as amplifyResetPassword,
+  confirmResetPassword as amplifyConfirmResetPassword,
   signOut as amplifySignOut, 
   getCurrentUser, 
   fetchUserAttributes, 
@@ -26,6 +28,8 @@ interface AuthContextType {
   register: (data: SignUpData) => Promise<{ isSignUpComplete: boolean; userId?: string }>;
   confirmRegistration: (email: string, code: string) => Promise<boolean>;
   resendCode: (email: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
+  confirmForgotPassword: (email: string, code: string, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => void;
   enrollInPathway: (pathwayId: string) => void;
@@ -277,6 +281,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const forgotPassword = async (email: string): Promise<void> => {
+    setIsLoading(true);
+    try {
+      if (awsConfig.isConfigured) {
+        await amplifyResetPassword({ username: email.toLowerCase().trim() });
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const confirmForgotPassword = async (email: string, code: string, newPassword: string): Promise<void> => {
+    setIsLoading(true);
+    try {
+      if (awsConfig.isConfigured) {
+        await amplifyConfirmResetPassword({
+          username: email.toLowerCase().trim(),
+          confirmationCode: code,
+          newPassword,
+        });
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     setIsLoading(true);
     try {
@@ -339,6 +369,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         register,
         confirmRegistration,
         resendCode,
+        forgotPassword,
+        confirmForgotPassword,
         logout,
         refreshUser,
         enrollInPathway,
@@ -362,6 +394,8 @@ const DEFAULT_AUTH_CONTEXT: AuthContextType = {
   register: async () => ({ isSignUpComplete: true }),
   confirmRegistration: async () => true,
   resendCode: async () => {},
+  forgotPassword: async () => {},
+  confirmForgotPassword: async () => {},
   logout: async () => {},
   refreshUser: () => {},
   enrollInPathway: () => {},
