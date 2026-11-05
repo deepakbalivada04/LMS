@@ -84,8 +84,8 @@ export const AdminDashboard: React.FC = () => {
     videoUrl: string;
     projectTitle: string;
   }>({
-    stageTitle: 'Stage 1: Chassis Assembly & Dual Motor Driver Wiring',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    stageTitle: 'Stage 1: Robot Chassis Assembly & Motor Driver Calibration',
+    videoUrl: 'https://robotics-lms-videos-processed-2026.s3.ap-southeast-2.amazonaws.com/projects/crs-esp32-rover/1793905763827-gemini_generated_video_fac0cdb7/hls/1793905763827-gemini_generated_video_fac0cdb7.m3u8',
     projectTitle: 'Project 1: Autonomous Obstacle-Avoiding Rover Kit',
   });
 
@@ -116,7 +116,7 @@ export const AdminDashboard: React.FC = () => {
   
   // Stage 1 for new project
   const [newProjStage1Title, setNewProjStage1Title] = useState('Stage 1: Core Hardware Assembly & Pinout Verification');
-  const [newProjStage1Video, setNewProjStage1Video] = useState('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+  const [newProjStage1Video, setNewProjStage1Video] = useState('');
   const [newProjStage1BOM, setNewProjStage1BOM] = useState('ESP32 Microcontroller (1x), L298N Motor Driver (1x), 7.4V LiPo Battery (1x)');
 
   // Add / Edit Stage Form State
@@ -214,6 +214,19 @@ export const AdminDashboard: React.FC = () => {
     userService.updateUserEnrollments(email, updated);
     loadData();
     showToast(`Updated project enrollments for ${target.name}.`);
+  };
+
+  // Toggle pathway enrollment for a student (e.g. Robot Kits, AI, Space, Code)
+  const handleTogglePathway = (email: string, pathwayId: any) => {
+    const target = users.find((u) => u.email === email);
+    if (!target) return;
+    const current = target.enrolledPathways || [];
+    const updated = current.includes(pathwayId)
+      ? current.filter((id) => id !== pathwayId)
+      : [...current, pathwayId];
+    userService.updateUserPathways(email, updated as any);
+    loadData();
+    showToast(`Updated pathway access for ${target.name}.`);
   };
 
   // Delete user
@@ -387,7 +400,7 @@ export const AdminDashboard: React.FC = () => {
           onProgress: (percent) => setUploadProgress(percent),
         });
 
-        finalVideoUrl = uploadResult.s3Url;
+        finalVideoUrl = uploadResult.hlsUrl || uploadResult.s3Url;
       } catch (err: any) {
         setIsUploadingToS3(false);
         alert(`S3 Upload failed: ${err.message}`);
@@ -457,7 +470,7 @@ export const AdminDashboard: React.FC = () => {
           projectId: targetProjectIdForModal,
           onProgress: (percent) => setUploadProgress(percent),
         });
-        finalVideoUrl = uploadResult.s3Url;
+        finalVideoUrl = uploadResult.hlsUrl || uploadResult.s3Url;
       } catch (err: any) {
         setIsUploadingToS3(false);
         alert(`S3 Upload failed: ${err.message}`);
@@ -877,28 +890,62 @@ export const AdminDashboard: React.FC = () => {
                           )}
                         </td>
 
-                        {/* Enrolled Projects */}
+                        {/* Enrolled Pathways & Projects */}
                         <td className="py-3.5 px-3">
-                          <div className="flex flex-wrap gap-1 max-w-xs">
-                            {projects.map((proj) => {
-                              const isEnrolled = userRecord.enrolledProjectIds?.includes(proj.projectId);
-                              return (
-                                <button
-                                  key={proj.projectId}
-                                  type="button"
-                                  disabled={isSelfAdmin}
-                                  onClick={() => handleToggleEnrollment(userRecord.email, proj.projectId)}
-                                  className={`px-2 py-0.5 rounded text-[10px] font-semibold transition ${
-                                    isEnrolled
-                                      ? 'bg-sky-50 text-sky-700 border border-sky-200'
-                                      : 'bg-slate-100 text-slate-400 hover:bg-slate-200 border border-transparent line-through'
-                                  }`}
-                                  title={isEnrolled ? `Click to unenroll from ${proj.title}` : `Click to enroll in ${proj.title}`}
-                                >
-                                  {proj.title.split(':')[0]}
-                                </button>
-                              );
-                            })}
+                          <div className="space-y-1.5 max-w-xs">
+                            {/* Pathways */}
+                            <div>
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Pathways</span>
+                              <div className="flex flex-wrap gap-1">
+                                {[
+                                  { id: 'robot-kits', label: 'Robot Kits' },
+                                  { id: 'how-ai-thinks', label: 'AI' },
+                                  { id: 'space-and-hardware', label: 'Space & Hardware' },
+                                  { id: 'prompting-and-code', label: 'Prompt & Code' },
+                                ].map((pw) => {
+                                  const isEnrolled = userRecord.enrolledPathways?.includes('all') || userRecord.enrolledPathways?.includes(pw.id);
+                                  return (
+                                    <button
+                                      key={pw.id}
+                                      type="button"
+                                      disabled={isSelfAdmin}
+                                      onClick={() => handleTogglePathway(userRecord.email, pw.id)}
+                                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition ${
+                                        isEnrolled
+                                          ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                          : 'bg-slate-100 text-slate-400 hover:bg-slate-200 border border-transparent'
+                                      }`}
+                                      title={isEnrolled ? `Enrolled in ${pw.label}` : `Enroll in ${pw.label}`}
+                                    >
+                                      {isEnrolled ? `✓ ${pw.label}` : `+ ${pw.label}`}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            
+                            {/* Individual Projects */}
+                            <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-100">
+                              {projects.map((proj) => {
+                                const isEnrolled = userRecord.enrolledProjectIds?.includes(proj.projectId);
+                                return (
+                                  <button
+                                    key={proj.projectId}
+                                    type="button"
+                                    disabled={isSelfAdmin}
+                                    onClick={() => handleToggleEnrollment(userRecord.email, proj.projectId)}
+                                    className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition ${
+                                      isEnrolled
+                                        ? 'bg-sky-50 text-sky-700 border border-sky-200'
+                                        : 'bg-slate-50 text-slate-400 hover:bg-slate-100 border border-transparent line-through'
+                                    }`}
+                                    title={isEnrolled ? `Click to unenroll from ${proj.title}` : `Click to enroll in ${proj.title}`}
+                                  >
+                                    {proj.title.split(':')[0]}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
                         </td>
 

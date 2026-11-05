@@ -48,14 +48,62 @@ export const HlsVideoPlayer: React.FC<HlsVideoPlayerProps> = ({
 
   const controlsTimeoutRef = useRef<any>(null);
 
+  // Helper to generate ordered candidate HLS URLs for an input source
+  const getCandidateHlsUrls = (rawSource: string): string[] => {
+    if (rawSource.startsWith('blob:')) return [rawSource];
+
+    const candidates: string[] = [];
+
+    // If source is already an .m3u8 URL
+    if (rawSource.includes('.m3u8')) {
+      candidates.push(rawSource);
+      // Also derive baseName.m3u8 if it was given master.m3u8
+      if (rawSource.includes('/hls/master.m3u8')) {
+        const parts = rawSource.split('/');
+        const hlsIdx = parts.indexOf('hls');
+        if (hlsIdx > 0) {
+          const folderName = parts[hlsIdx - 1];
+          candidates.push(rawSource.replace('/hls/master.m3u8', `/hls/${folderName}.m3u8`));
+        }
+      }
+      return candidates;
+    }
+
+    // If source is an S3 MP4 URL (e.g. projects/.../1793905763827-gemini_generated_video_fac0cdb7.mp4)
+    if (rawSource.includes('robotics-lms-videos-2026') || rawSource.includes('robotics-lms-videos-processed-2026')) {
+      const withoutExt = rawSource.replace(/\.[a-zA-Z0-9]+$/, '');
+      const cleanFolder = withoutExt.replace('robotics-lms-videos-2026', 'robotics-lms-videos-processed-2026');
+      const baseName = withoutExt.split('/').pop() || '';
+
+      // 1. Primary: Exact MediaConvert output name (e.g. .../hls/1793905763827-video.m3u8)
+      if (baseName) {
+        candidates.push(`${cleanFolder}/hls/${baseName}.m3u8`);
+      }
+      // 2. Secondary: master.m3u8
+      candidates.push(`${cleanFolder}/hls/master.m3u8`);
+      // 3. Fallback: .m3u8
+      candidates.push(`${cleanFolder}/hls/.m3u8`);
+      // 4. Raw MP4 fallback
+      candidates.push(rawSource);
+
+      return candidates;
+    }
+
+    return [rawSource];
+  };
+
   // Initialize Video & HLS
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     setHasError(null);
-    const effectiveSrc = videoUploadService.getLocalBlobForS3Url(src) || src;
-    const isHlsStream = effectiveSrc.includes('.m3u8');
+    const localBlob = videoUploadService.getLocalBlobForS3Url(src);
+    if (localBlob) {
+      video.src = localBlob;
+      setIsHlsActive(false);
+      return;
+    }
 
     // Destroy previous HLS instance if any
     if (hlsRef.current) {
@@ -63,66 +111,70 @@ export const HlsVideoPlayer: React.FC<HlsVideoPlayerProps> = ({
       hlsRef.current = null;
     }
 
-    if (isHlsStream && Hls.isSupported()) {
-      const hls = new Hls({
-        capLevelToPlayerSize: true,
-        autoStartLoad: true,
-      });
+    const candidateUrls = getCandidateHlsUrls(src);
+    let candidateIndex = 0;
 
-      hls.loadSource(effectiveSrc);
-      hls.attachMedia(video);
+    const tryNextStream = () => {
+      if (candidateIndex >= candidateUrls.length) {
+        setHasError('Stream connection error. Please verify S3 video files.');
+        return;
+      }
 
-      hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
-        setIsHlsActive(true);
-        const levels = data.levels.map((lvl, index) => ({
-          id: index,
-          height: lvl.height,
-          bitrate: lvl.bitrate,
-        }));
-        setQualityLevels(levels);
-      });
+      const currentTarget = candidateUrls[candidateIndex];
+      candidateIndex++;
 
-      hls.on(Hls.Events.ERROR, (_, data) => {
-        if (data.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              console.warn('[HLS] Network error encountered (manifest may still be processing by MediaConvert)...');
-              // If HLS manifest is not yet ready, gracefully try raw MP4 source
-              if (effectiveSrc.includes('/hls/')) {
-                const rawMp4Candidate = effectiveSrc
-                  .replace('robotics-lms-videos-processed-2026', 'robotics-lms-videos-2026')
-                  .replace('/hls/master.m3u8', '.mp4');
-                console.log('[HLS Fallback] Playing raw MP4 while transcoding finishes:', rawMp4Candidate);
-                hls.destroy();
-                video.src = rawMp4Candidate;
-                setIsHlsActive(false);
-                return;
-              }
-              hls.startLoad();
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              console.warn('[HLS] Media error encountered, recovering media...');
-              hls.recoverMediaError();
-              break;
-            default:
-              console.error('[HLS] Unrecoverable error:', data);
-              setHasError('Adaptive stream processing. Displaying source feed.');
-              hls.destroy();
-              break;
-          }
+      console.log(`[Player] Attempting video stream [${candidateIndex}/${candidateUrls.length}]:`, currentTarget);
+
+      if (currentTarget.includes('.m3u8') && Hls.isSupported()) {
+        if (hlsRef.current) {
+          hlsRef.current.destroy();
+          hlsRef.current = null;
         }
-      });
 
-      hlsRef.current = hls;
-    } else if (video.canPlayType('application/vnd.apple.mpegurl') && isHlsStream) {
-      // Native Safari HLS
-      video.src = effectiveSrc;
-      setIsHlsActive(true);
-    } else {
-      // Standard MP4 or direct video source
-      video.src = effectiveSrc;
-      setIsHlsActive(false);
-    }
+        const hls = new Hls({
+          capLevelToPlayerSize: true,
+          autoStartLoad: true,
+        });
+
+        hls.loadSource(currentTarget);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
+          console.log('[HLS] Stream connected and manifest parsed:', currentTarget);
+          setIsHlsActive(true);
+          setHasError(null);
+          const levels = data.levels.map((lvl, index) => ({
+            id: index,
+            height: lvl.height,
+            bitrate: lvl.bitrate,
+          }));
+          setQualityLevels(levels);
+        });
+
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          if (data.fatal) {
+            console.warn('[HLS] Stream failed on:', currentTarget, data.type);
+            hls.destroy();
+            hlsRef.current = null;
+            // Advance to next stream candidate
+            tryNextStream();
+          }
+        });
+
+        hlsRef.current = hls;
+      } else if (video.canPlayType('application/vnd.apple.mpegurl') && currentTarget.includes('.m3u8')) {
+        // Native Safari HLS
+        video.src = currentTarget;
+        setIsHlsActive(true);
+      } else {
+        // Standard MP4 fallback
+        console.log('[Player] Playing direct video format:', currentTarget);
+        video.src = currentTarget;
+        setIsHlsActive(false);
+      }
+    };
+
+    tryNextStream();
 
     return () => {
       if (hlsRef.current) {

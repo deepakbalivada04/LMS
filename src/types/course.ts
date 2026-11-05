@@ -41,6 +41,16 @@ export interface ProjectStage {
   codeSnippets: CodeSnippet[];
 }
 
+export type ProjectCategory = 
+  | 'Prompting and Code'
+  | 'How AI Thinks'
+  | 'Space and Hardware'
+  | 'Robot Kits'
+  | 'Robotics'
+  | 'Autonomous Vehicles'
+  | 'IoT & Cloud'
+  | 'Kinematics';
+
 export interface HardwareProject {
   projectId: string;
   courseId: string; // compatibility with backend
@@ -48,7 +58,8 @@ export interface HardwareProject {
   description: string;
   level: 'Beginner' | 'Intermediate' | 'Advanced';
   hardwareKit: string;
-  category: 'Robotics' | 'Autonomous Vehicles' | 'IoT & Cloud' | 'Kinematics';
+  category: ProjectCategory;
+  pathwayId?: string;
   accentColor: string;
   modules: ProjectStage[];
 }

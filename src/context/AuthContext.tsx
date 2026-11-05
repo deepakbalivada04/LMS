@@ -28,6 +28,7 @@ interface AuthContextType {
   resendCode: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => void;
+  enrollInPathway: (pathwayId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -125,6 +126,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         role: regRecord.role || role,
         status: regRecord.status,
         enrolledProjectIds: regRecord.enrolledProjectIds,
+        enrolledPathways: regRecord.enrolledPathways || [],
         isMock: false,
       });
     } catch (err) {
@@ -157,6 +159,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           role: isSuperAdmin ? 'admin' : regRecord.role,
           status: regRecord.status,
           enrolledProjectIds: regRecord.enrolledProjectIds,
+          enrolledPathways: regRecord.enrolledPathways || [],
           isMock: true,
         };
         setUser(authUser);
@@ -185,6 +188,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           role: regRecord.role || role,
           status: regRecord.status,
           enrolledProjectIds: regRecord.enrolledProjectIds,
+          enrolledPathways: regRecord.enrolledPathways || [],
           isMock: false,
         };
         setUser(authUser);
@@ -299,8 +303,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           role: regRecord.role,
           status: regRecord.status,
           enrolledProjectIds: regRecord.enrolledProjectIds,
+          enrolledPathways: regRecord.enrolledPathways || [],
         } : null);
       }
+    }
+  };
+
+  const enrollInPathway = (pathwayId: string) => {
+    if (!user) return;
+    const current = (user.enrolledPathways || []) as any[];
+    if (!current.includes(pathwayId)) {
+      const updated = [...current, pathwayId];
+      userService.updateUserPathways(user.email, updated);
+      setUser((prev) => prev ? {
+        ...prev,
+        enrolledPathways: updated,
+      } : null);
     }
   };
 
@@ -323,6 +341,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         resendCode,
         logout,
         refreshUser,
+        enrollInPathway,
       }}
     >
       {children}
@@ -330,10 +349,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   );
 };
 
+const DEFAULT_AUTH_CONTEXT: AuthContextType = {
+  user: null,
+  isAuthenticated: false,
+  isLoading: false,
+  isMockMode: false,
+  role: 'guest',
+  isAdmin: false,
+  adminViewMode: 'student',
+  toggleAdminViewMode: () => {},
+  login: async () => ({ userId: 'guest', email: '', name: 'Guest', role: 'guest', isMock: false }),
+  register: async () => ({ isSignUpComplete: true }),
+  confirmRegistration: async () => true,
+  resendCode: async () => {},
+  logout: async () => {},
+  refreshUser: () => {},
+  enrollInPathway: () => {},
+};
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  return context || DEFAULT_AUTH_CONTEXT;
 };

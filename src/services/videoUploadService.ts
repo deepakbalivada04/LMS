@@ -158,7 +158,8 @@ export const videoUploadService = {
 
       // Calculate expected MediaConvert HLS destination playlist
       const cleanKey = s3Key.substring(0, s3Key.lastIndexOf('.')) || s3Key;
-      const hlsUrl = `https://robotics-lms-videos-processed-2026.s3.${region}.amazonaws.com/${cleanKey}/hls/master.m3u8`;
+      const fileNameWithoutExt = cleanKey.split('/').pop() || 'master';
+      const hlsUrl = `https://robotics-lms-videos-processed-2026.s3.${region}.amazonaws.com/${cleanKey}/hls/${fileNameWithoutExt}.m3u8`;
 
       // Cache the local blob against both the raw S3 URL and the HLS URL so playback is instant
       LOCAL_BLOB_CACHE.set(s3Url, localPlaybackUrl);

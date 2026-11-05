@@ -5,7 +5,7 @@ const USERS_STORAGE_KEY = 'robolms_users_registry';
 
 const SUPER_ADMIN_EMAIL = awsConfig.adminEmail.toLowerCase();
 
-// Initial seed
+// Initial seed - Only Super Admin is pre-seeded. All other users come dynamically from live DB / Cognito.
 const INITIAL_USERS: UserRecord[] = [
   {
     userId: 'usr_admin_master',
@@ -14,38 +14,9 @@ const INITIAL_USERS: UserRecord[] = [
     role: 'admin',
     status: 'approved',
     createdAt: new Date().toISOString(),
-    enrolledProjectIds: ['crs-esp32-rover', 'crs-robotic-arm-kinematics', 'crs-iot-greenhouse'],
+    enrolledProjectIds: ['skill-assembling-first-robot', 'skill-debugging-dead-robot', 'crs-esp32-rover'],
+    enrolledPathways: ['all', 'robot-kits', 'how-ai-thinks', 'space-and-hardware', 'prompting-and-code'],
     notes: 'Super Administrator & Hardware Lab Director',
-  },
-  {
-    userId: 'usr_guest_demo1',
-    email: 'kiran.robotics@gmail.com',
-    name: 'Kiran Patel',
-    role: 'guest',
-    status: 'pending',
-    createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-    enrolledProjectIds: [],
-    notes: 'Awaiting admin approval for ESP32 Rover hardware kit.',
-  },
-  {
-    userId: 'usr_guest_demo2',
-    email: 'ananya.embedded@outlook.com',
-    name: 'Ananya Sharma',
-    role: 'guest',
-    status: 'pending',
-    createdAt: new Date(Date.now() - 3600000 * 18).toISOString(),
-    enrolledProjectIds: [],
-    notes: 'Registered for 6-DOF Robotic Arm Lab.',
-  },
-  {
-    userId: 'usr_student_demo3',
-    email: 'rahul.iot@edu.in',
-    name: 'Rahul Verma',
-    role: 'student',
-    status: 'approved',
-    createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
-    enrolledProjectIds: ['crs-esp32-rover', 'crs-iot-greenhouse'],
-    notes: 'Enrolled student - kit dispatched.',
   },
 ];
 
@@ -57,13 +28,22 @@ export const userService = {
         localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(INITIAL_USERS));
         return INITIAL_USERS;
       }
-      const users: UserRecord[] = JSON.parse(stored);
+      let users: UserRecord[] = JSON.parse(stored);
+
+      // Clean out any legacy mock demo accounts
+      users = users.filter(
+        (u) =>
+          u.email.toLowerCase() === SUPER_ADMIN_EMAIL ||
+          !['usr_guest_demo1', 'usr_guest_demo2', 'usr_student_demo3'].includes(u.userId)
+      );
+
       // Ensure super admin always exists
       const hasSuperAdmin = users.some((u) => u.email.toLowerCase() === SUPER_ADMIN_EMAIL);
       if (!hasSuperAdmin) {
         users.unshift(INITIAL_USERS[0]);
-        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
       }
+
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
       return users;
     } catch {
       return INITIAL_USERS;
@@ -158,10 +138,61 @@ export const userService = {
       ...users[index],
       enrolledProjectIds: projectIds,
     };
-
     users[index] = updated;
     localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
     return updated;
+  },
+
+  /**
+   * Admin assigns whole cluster pathways to a student (e.g. 'robot-kits', 'how-ai-thinks')
+   */
+  updateUserPathways(email: string, pathwayIds: string[]): UserRecord {
+    const users = this.getAllUsers();
+    const index = users.findIndex((u) => u.email.toLowerCase() === email.toLowerCase().trim());
+    if (index === -1) throw new Error('User not found');
+
+    const updated: UserRecord = {
+      ...users[index],
+      enrolledPathways: pathwayIds,
+    };
+    users[index] = updated;
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+    return updated;
+  },
+
+  /**
+   * Check whether a user has permission to watch a specific video stage.
+   * Stage 0 (the Intro video) is 100% open to everyone (even guests).
+   * Deeper stages unlock if enrolled in that specific project or that cluster pathway!
+   */
+  hasStageAccess(
+    user: { email: string; role?: string } | null,
+    project: { projectId: string; pathwayId?: string },
+    stageIndex: number
+  ): boolean {
+    // Stage 0 (The Intro Video) is ALWAYS available to everyone, even guests!
+    if (stageIndex === 0) return true;
+
+    if (!user) return false;
+    if (user.role === 'admin' || user.email.toLowerCase() === SUPER_ADMIN_EMAIL) return true;
+
+    const userRecord = this.getUserByEmail(user.email);
+    if (!userRecord) return false;
+
+    // Direct project enrollment
+    if (userRecord.enrolledProjectIds && userRecord.enrolledProjectIds.includes(project.projectId)) {
+      return true;
+    }
+
+    // Cluster pathway enrollment (e.g. 'robot-kits', 'how-ai-thinks')
+    const pathway = project.pathwayId;
+    if (pathway && userRecord.enrolledPathways) {
+      if (userRecord.enrolledPathways.includes('all') || userRecord.enrolledPathways.includes(pathway)) {
+        return true;
+      }
+    }
+
+    return false;
   },
 
   /**

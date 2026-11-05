@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import loginBackdrop from '../../assets/login-backdrop.jpg';
 import { 
   GraduationCap, 
   Mail, 
@@ -13,7 +14,11 @@ import {
   EyeOff, 
   Users,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  Cpu,
+  Bot,
+  Code2,
+  Sparkles
 } from 'lucide-react';
 
 type AuthMode = 'signin' | 'signup' | 'confirm';
@@ -107,74 +112,94 @@ export const LoginPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#f4f7fe] flex items-center justify-center p-4 sm:p-6 lg:p-10 relative overflow-hidden selection:bg-sky-500 selection:text-white">
       {/* Decorative ambient yellow/amber blur accents matching dashboard */}
-      <div className="absolute -left-20 top-20 w-96 h-96 bg-amber-200/40 rounded-full blur-3xl pointer-events-none" />
+      {/* Subtle full-page ambient backdrop overlay */}
+      <div 
+        className="fixed inset-0 pointer-events-none opacity-[0.03] bg-cover bg-center"
+        style={{ backgroundImage: `url(${loginBackdrop})` }} 
+      />
+      <div className="absolute -left-20 top-20 w-96 h-96 bg-emerald-200/40 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -right-20 bottom-10 w-96 h-96 bg-sky-200/40 rounded-full blur-3xl pointer-events-none" />
 
       {/* Main Dual-Column Auth Card */}
-      <div className="w-full max-w-5xl bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden grid grid-cols-1 lg:grid-cols-12 relative z-10">
+      <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden grid grid-cols-1 lg:grid-cols-12 relative z-10">
         {/* ========================================================= */}
-        {/* LEFT COLUMN: BRAND TEAL BANNER (MATCHING THE DASHBOARD)   */}
+        {/* LEFT COLUMN: CINEMATIC ROBOTICS & CODING IDE HERO BANNER  */}
         {/* ========================================================= */}
-        <div className="lg:col-span-5 bg-gradient-to-br from-[#2bb398] via-[#24a58b] to-[#1e967d] p-8 sm:p-10 text-white flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute right-0 top-0 bottom-0 w-full opacity-15 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent" />
+        <div className="lg:col-span-5 relative p-8 sm:p-10 text-white flex flex-col justify-between overflow-hidden bg-slate-950 min-h-[540px]">
+          {/* High-Resolution Maker Lab Backdrop */}
+          <img 
+            src={loginBackdrop} 
+            alt="Robotics Lab Coding IDE and Hardware Kits"
+            className="absolute inset-0 w-full h-full object-cover object-center scale-105 transition-transform duration-700 hover:scale-100 opacity-75"
+          />
 
-          {/* Top Brand Logo */}
+          {/* Aesthetic Multi-Layer Dark Gradient & Cyber-Maker Glow */}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-emerald-950/50 backdrop-blur-[1px]" />
+          <div className="absolute inset-0 bg-emerald-500/10 mix-blend-overlay" />
+
+          {/* Top Brand Logo & Floating Badges */}
           <div className="relative z-10">
-            <div className="flex items-center gap-2.5 mb-6">
-              <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/30 shadow-sm">
-                <GraduationCap className="w-6 h-6" />
+            <div className="flex items-center gap-2.5 mb-5">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 backdrop-blur-md flex items-center justify-center text-emerald-300 border border-emerald-400/30 shadow-md">
+                <Cpu className="w-5 h-5" />
               </div>
               <div>
                 <span className="font-extrabold text-lg tracking-tight text-white block leading-tight">
-                  Robo<span className="text-emerald-200">Academy</span>
+                  Robo<span className="text-emerald-400">Academy</span>
                 </span>
-                <span className="text-[10px] text-emerald-100 uppercase tracking-widest font-semibold">
-                  Hardware & Robotics LMS
+                <span className="text-[10px] text-emerald-200 uppercase tracking-widest font-semibold flex items-center gap-1">
+                  <span>Hardware LMS & Web IDE</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                 </span>
               </div>
             </div>
 
-            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug mb-3">
-              Learn With Effectively With Us!
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[11px] font-semibold mb-3 backdrop-blur-md">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Physical Hardware Kits + Cloud Transcoding</span>
+            </div>
+
+            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug mb-3 text-white drop-shadow-sm">
+              Build Real Robots.<br />
+              Code Microcontrollers.
             </h2>
-            <p className="text-xs sm:text-sm text-emerald-100 font-medium leading-relaxed mb-6">
-              Hands-on hardware labs, ESP32 microcontrollers, 6-DOF kinematics, & AWS Cloud telemetry.
+            <p className="text-xs text-slate-200 font-medium leading-relaxed mb-6 max-w-sm drop-shadow-sm">
+              Hands-on ESP32 rover assembly, 6-DOF robotic arm kinematics, visual block coding, & live AWS video telemetry.
             </p>
 
-            {/* Stat Badges */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 bg-white/15 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-white/20 w-fit">
-                <div className="w-8 h-8 rounded-full bg-rose-500 flex items-center justify-center text-white shadow-xs">
-                  <GraduationCap className="w-4 h-4" />
+            {/* Hardware Lab Tech Badges */}
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-3 bg-slate-900/80 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-slate-700/60 shadow-sm">
+                <div className="w-8 h-8 rounded-xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-400">
+                  <Bot className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[10px] text-emerald-100 block font-medium">Active Students</span>
-                  <span className="text-xs font-bold text-white">75,000+ Enrolled</span>
+                  <span className="text-[10px] text-slate-400 block font-medium">Physical Kit Curriculum</span>
+                  <span className="text-xs font-bold text-white">ESP32 Rover & Robotic Arm</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 bg-white/15 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-white/20 w-fit">
-                <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center text-slate-900 shadow-xs">
-                  <Users className="w-4 h-4" />
+              <div className="flex items-center gap-3 bg-slate-900/80 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-slate-700/60 shadow-sm">
+                <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-purple-400">
+                  <Code2 className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[10px] text-emerald-100 block font-medium">Expert Mentors</span>
-                  <span className="text-xs font-bold text-white">200+ Instructors</span>
+                  <span className="text-[10px] text-slate-400 block font-medium">Interactive Visual IDE</span>
+                  <span className="text-xs font-bold text-white">Blockly + C++ Firmware Flashing</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Bottom Trust Badge & Graphic */}
-          <div className="pt-8 relative z-10 flex items-center justify-between border-t border-white/20 mt-6">
-            <span className="text-xs text-emerald-100 flex items-center gap-1.5 font-medium">
-              <ShieldCheck className="w-4 h-4 text-emerald-200" />
+          {/* Bottom Trust Badge & Telemetry */}
+          <div className="pt-6 relative z-10 flex items-center justify-between border-t border-slate-800/80 mt-6 text-xs text-slate-300">
+            <span className="flex items-center gap-1.5 font-medium">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
               Amazon Cognito Protected
             </span>
-            <div className="flex items-end gap-1 text-3xl select-none">
-              <span>👨‍🎓</span>
-              <span>👩‍🎓</span>
-              <span>🧑‍🎓</span>
+            <div className="flex items-center gap-1.5 font-mono text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              AWS Cloud Live
             </div>
           </div>
         </div>

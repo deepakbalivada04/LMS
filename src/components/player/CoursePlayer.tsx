@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Course, Module } from '../../types/course';
 import { useProgress } from '../../context/ProgressContext';
 import { useAuth } from '../../context/AuthContext';
+import { userService } from '../../services/userService';
 import { HlsVideoPlayer } from './HlsVideoPlayer';
 import { HardwareChecklistTab } from './HardwareChecklistTab';
 import { WiringDiagramsTab } from './WiringDiagramsTab';
@@ -25,7 +26,8 @@ import {
   Lock,
   CheckCheck,
   AlertCircle,
-  ShieldAlert
+  ShieldAlert,
+  Sparkles
 } from 'lucide-react';
 
 interface CoursePlayerProps {
@@ -36,7 +38,7 @@ type BottomTabType = 'hardware' | 'wiring' | 'code' | 'overview';
 
 export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
   const navigate = useNavigate();
-  const { role, isAdmin } = useAuth();
+  const { user, role, isAdmin, enrollInPathway } = useAuth();
   const { markModuleComplete, isModuleCompleted, getCourseProgress, isSyncingWithAWS } = useProgress();
 
   const [activeModuleIndex, setActiveModuleIndex] = useState(0);
@@ -45,13 +47,44 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
   const [isMarkingComplete, setIsMarkingComplete] = useState(false);
   const [showToast, setShowToast] = useState<string | null>(null);
 
-  const activeModule: Module = course.modules[activeModuleIndex] || course.modules[0];
+  const activeModule: Module | undefined = course.modules[activeModuleIndex] || course.modules[0];
   const progress = getCourseProgress(course.courseId);
-  const isCurrentModuleDone = isModuleCompleted(course.courseId, activeModule.moduleId);
-  const isAllModulesCompleted = course.modules.every((m) => isModuleCompleted(course.courseId, m.moduleId));
+  const isCurrentModuleDone = activeModule ? isModuleCompleted(course.courseId, activeModule.moduleId) : false;
+  const isAllModulesCompleted = course.modules.length > 0 && course.modules.every((m) => isModuleCompleted(course.courseId, m.moduleId));
 
   const isGuest = role === 'guest';
-  const isStageLockedForGuest = isGuest && activeModuleIndex > 0;
+  const isStageLocked = !userService.hasStageAccess(user, course, activeModuleIndex);
+
+  if (!activeModule) {
+    return (
+      <div className="flex-1 flex flex-col space-y-6 max-w-[1600px] mx-auto w-full p-12 text-center bg-white rounded-3xl border border-slate-100 shadow-sm">
+        <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto mb-4">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-800 mb-1">No Video Build Stages Configured Yet</h2>
+        <p className="text-xs text-slate-400 mb-6 max-w-md mx-auto">
+          This hardware project has no video build stages uploaded yet. Use the Super Admin Console to upload video files directly to Amazon S3.
+        </p>
+        <div className="flex items-center justify-center gap-3">
+          <Link
+            to="/dashboard"
+            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs inline-flex items-center gap-2 transition"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Dashboard
+          </Link>
+          {isAdmin && (
+            <Link
+              to="/admin"
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs inline-flex items-center gap-2 shadow-sm transition"
+            >
+              <span>Upload Video in Admin Console</span>
+            </Link>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const handleMarkAsComplete = async () => {
     if (isGuest) {
@@ -182,26 +215,45 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({ course }) => {
         {/* LEFT / CENTER VIEWPORT */}
         <div className={`${isSidebarOpen ? 'lg:col-span-8' : 'lg:col-span-12'} space-y-6 transition-all duration-300`}>
           {/* Video or Locked Card */}
-          {isStageLockedForGuest ? (
+          {isStageLocked ? (
             <div className="bg-slate-900 rounded-3xl p-12 text-center text-white border border-slate-800 flex flex-col items-center justify-center min-h-[360px] space-y-4">
               <div className="w-16 h-16 rounded-3xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
                 <Lock className="w-8 h-8" />
               </div>
               <div className="max-w-md">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[11px] font-semibold mb-2">
+                  <span>Pathway Enrollment Required</span>
+                </div>
                 <h3 className="text-lg font-extrabold text-white mb-1">
-                  Enrolled Lab Access Required
+                  Stage {activeModuleIndex + 1}: {activeModule.title}
                 </h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Stage 1 is open for free preview. To access Stage {activeModuleIndex + 1} ({activeModule.title}), interactive schematics, and hardware certification, your account must be approved by the Admin as an enrolled student.
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Stage 1 (Intro Video) is open for free preview. To unlock this build stage, interactive wiring diagrams, code downloads, and lab certification, register for the <strong className="text-amber-400">{course.category}</strong> pathway.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setActiveModuleIndex(0)}
-                className="py-2.5 px-5 bg-sky-500 hover:bg-sky-600 rounded-xl text-xs font-bold text-white transition shadow-sm"
-              >
-                Back to Stage 1 Free Preview
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (course.pathwayId) {
+                      enrollInPathway(course.pathwayId);
+                      setShowToast(`Registered for ${course.category}! All video stages unlocked.`);
+                      setTimeout(() => setShowToast(null), 3500);
+                    }
+                  }}
+                  className="py-2.5 px-5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-extrabold transition shadow-md flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-4 h-4 text-slate-950" />
+                  <span>Register to Unlock {course.category} Pathway</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveModuleIndex(0)}
+                  className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition"
+                >
+                  Back to Stage 1 Free Preview
+                </button>
+              </div>
             </div>
           ) : (
             <div className="bg-black rounded-3xl overflow-hidden shadow-lg border border-slate-100">

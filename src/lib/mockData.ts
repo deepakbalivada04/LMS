@@ -3,7 +3,7 @@ import { AuthUser } from '../types/auth';
 
 export const DEMO_USERS: Record<string, AuthUser> = {
   student: {
-    userId: 'usr_student_001',
+    userId: 'usr_student_master',
     email: 'student@robotics.edu',
     name: 'Sannath Koushik',
     role: 'student',
@@ -11,307 +11,61 @@ export const DEMO_USERS: Record<string, AuthUser> = {
   },
 };
 
+// Canonical live S3 MediaConvert HLS streaming output
+export const LIVE_S3_HLS_URL = 'https://robotics-lms-videos-processed-2026.s3.ap-southeast-2.amazonaws.com/projects/crs-esp32-rover/1793905763827-gemini_generated_video_fac0cdb7/hls/1793905763827-gemini_generated_video_fac0cdb7.m3u8';
+
 export const SAMPLE_PROJECTS: HardwareProject[] = [
+  // =========================================================================
+  // CLUSTER 1: ROBOT KITS
+  // =========================================================================
   {
-    projectId: 'crs-esp32-rover',
-    courseId: 'crs-esp32-rover',
-    title: 'Project 1: Autonomous Obstacle-Avoiding Rover Kit',
-    description: 'Assemble a differential-drive 4WD robotic rover using the ESP32 microcontroller, L298N dual H-Bridge motor driver, HC-SR04 ultrasonic sonar, and 7.4V LiPo battery pack.',
-    level: 'Intermediate',
-    category: 'Autonomous Vehicles',
-    hardwareKit: 'RoboRover Kit v2.4 (ESP32, L298N, TT Motors, Sonar, 2S LiPo)',
-    accentColor: '#0ea5e9',
-    modules: [
-      {
-        stageId: 'mod-1',
-        moduleId: 'mod-1',
-        title: 'Stage 1: Chassis Assembly & Dual Motor Driver Wiring',
-        description: 'Mount the yellow gearbox DC motors, wire the L298N driver to ESP32 PWM pins, and establish a common ground with the LiPo battery.',
-        durationMinutes: 24,
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-        hardwareChecklist: [
-          {
-            id: 'hw-1',
-            name: 'ESP32 NodeMCU-32S Board',
-            partNumber: 'ESP-WROOM-32',
-            quantity: 1,
-            description: 'Dual-core MCU with built-in Wi-Fi and Bluetooth LE.',
-            pinoutNotes: 'GPIO 16, 17, 18, 19 configured for PWM motor signals.',
-          },
-          {
-            id: 'hw-2',
-            name: 'L298N Dual H-Bridge Motor Driver',
-            quantity: 1,
-            description: 'Drives two DC motors with 5V onboard regulator capability.',
-            pinoutNotes: 'Remove 5V enable jumper if powering motors > 12V.',
-          },
-          {
-            id: 'hw-3',
-            name: '7.4V 2S LiPo Battery 2200mAh',
-            quantity: 1,
-            description: 'Main high-discharge power rail for motors and regulated logic.',
-            pinoutNotes: 'Ensure XT60 connector is properly seated before switching.',
-          },
-          {
-            id: 'hw-4',
-            name: 'Yellow TT Gearbox DC Motors (1:48)',
-            quantity: 2,
-            description: 'High-torque 3V-6V DC geared motors with rubber wheels.',
-          },
-        ],
-        wiringDiagrams: [
-          {
-            id: 'wd-1',
-            title: 'ESP32 to L298N Motor Driver Wiring',
-            diagramType: 'l298n-motor',
-            description: 'Connect ESP32 PWM pins to L298N IN1-IN4. LiPo ground MUST be tied together with ESP32 GND for a common reference.',
-            voltageWarning: 'WARNING: Never connect 7.4V battery power directly to ESP32 3.3V or VIN without the 5V regulator!',
-            pinConnections: [
-              { from: 'ESP32 GPIO 16', to: 'L298N IN1 (Motor A Forward)', signalType: 'PWM', color: '#0ea5e9' },
-              { from: 'ESP32 GPIO 17', to: 'L298N IN2 (Motor A Reverse)', signalType: 'GPIO', color: '#38bdf8' },
-              { from: 'ESP32 GPIO 18', to: 'L298N IN3 (Motor B Forward)', signalType: 'PWM', color: '#6366f1' },
-              { from: 'ESP32 GPIO 19', to: 'L298N IN4 (Motor B Reverse)', signalType: 'GPIO', color: '#818cf8' },
-              { from: 'ESP32 GND', to: 'L298N GND (Common Ground)', signalType: 'Ground', color: '#64748b' },
-              { from: 'LiPo 7.4V (+)', to: 'L298N 12V Power Terminal', signalType: 'Power', color: '#f43f5e' },
-              { from: 'LiPo GND (-)', to: 'L298N GND Terminal', signalType: 'Ground', color: '#0f172a' },
-            ],
-          },
-        ],
-        codeSnippets: [
-          {
-            id: 'snip-1',
-            filename: 'rover_motor_control.ino',
-            language: 'arduino',
-            description: 'ESP32 hardware LEDC PWM initialization and differential steering routines.',
-            code: `// ESP32 Rover Motor Driver PWM Control
-#define PIN_IN1 16
-#define PIN_IN2 17
-#define PIN_IN3 18
-#define PIN_IN4 19
-
-const int pwmFreq = 20000;
-const int pwmResolution = 8; // 0-255 duty cycle
-const int channelA = 0;
-const int channelB = 1;
-
-void setup() {
-  Serial.begin(115200);
-  
-  // Attach LEDC PWM channels to ESP32 pins
-  ledcAttachChannel(PIN_IN1, pwmFreq, pwmResolution, channelA);
-  ledcAttachChannel(PIN_IN3, pwmFreq, pwmResolution, channelB);
-  
-  pinMode(PIN_IN2, OUTPUT);
-  pinMode(PIN_IN4, OUTPUT);
-
-  // Initial Drive Forward at 75% speed
-  digitalWrite(PIN_IN2, LOW);
-  ledcWriteChannel(channelA, 190);
-  
-  digitalWrite(PIN_IN4, LOW);
-  ledcWriteChannel(channelB, 190);
-  
-  Serial.println("RoboRover: Motors Initialized and Running!");
-}
-
-void loop() {
-  // Navigation loop handled in Stage 2
-}
-`,
-          },
-        ],
-      },
-      {
-        stageId: 'mod-2',
-        moduleId: 'mod-2',
-        title: 'Stage 2: Ultrasonic Sonar Sensor Calibration & Obstacle Avoidance',
-        description: 'Mount the HC-SR04 sonar sensor on a pan-tilt bracket, wire the 5V-to-3.3V voltage divider on the Echo line, and implement acoustic spike rejection.',
-        durationMinutes: 18,
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-        hardwareChecklist: [
-          {
-            id: 'hw-5',
-            name: 'HC-SR04 Ultrasonic Sensor',
-            quantity: 1,
-            description: 'Sonar ranging sensor measuring distances from 2cm to 400cm.',
-            pinoutNotes: 'VCC 5V, Trig to GPIO 5, Echo through 1k/2k voltage divider to GPIO 4.',
-          },
-          {
-            id: 'hw-6',
-            name: 'Resistors (1k Ohm & 2k Ohm)',
-            quantity: 2,
-            description: 'Voltage divider stepping 5V down to 3.3V logic for ESP32 safety.',
-          },
-        ],
-        wiringDiagrams: [
-          {
-            id: 'wd-2',
-            title: 'Sonar Sensor Voltage Divider Protection',
-            diagramType: 'ultrasonic-divider',
-            description: '5V Echo output stepped down through a 1k / 2k resistor divider to safeguard ESP32 3.3V inputs.',
-            voltageWarning: 'ESP32 GPIO pins are strictly 3.3V logic! Exceeding 3.6V will permanently damage the silicon.',
-            pinConnections: [
-              { from: 'ESP32 5V VIN', to: 'HC-SR04 VCC', signalType: 'Power', color: '#f43f5e' },
-              { from: 'ESP32 GPIO 5', to: 'HC-SR04 Trig', signalType: 'GPIO', color: '#0ea5e9' },
-              { from: 'HC-SR04 Echo (5V)', to: '1k Resistor Input', signalType: 'Analog', color: '#f59e0b' },
-              { from: 'Divider Node (3.3V)', to: 'ESP32 GPIO 4', signalType: 'GPIO', color: '#2bb398' },
-              { from: '2k Resistor Leg', to: 'ESP32 GND', signalType: 'Ground', color: '#64748b' },
-            ],
-          },
-        ],
-        codeSnippets: [
-          {
-            id: 'snip-2',
-            filename: 'sonar_avoidance.py',
-            language: 'python',
-            description: 'Median filter implementation for acoustic distance spike filtering.',
-            code: `import statistics
-import time
-
-class SonarSensor:
-    def __init__(self, window_size=5):
-        self.buffer = []
-        self.window_size = window_size
-
-    def add_reading(self, raw_cm):
-        if 2.0 <= raw_cm <= 400.0:
-            self.buffer.append(raw_cm)
-            if len(self.buffer) > self.window_size:
-                self.buffer.pop(0)
-        return self.filtered_distance()
-
-    def filtered_distance(self):
-        if not self.buffer:
-            return -1.0
-        return statistics.median(self.buffer)
-
-# Test run
-sensor = SonarSensor()
-for sample in [25.4, 26.1, 999.0, 25.8, 25.5]:
-    print("Filtered Distance (cm):", sensor.add_reading(sample))
-`,
-          },
-        ],
-      },
-    ],
-  },
-  {
-    projectId: 'crs-robotic-arm-kinematics',
-    courseId: 'crs-robotic-arm-kinematics',
-    title: 'Project 2: 6-DOF Robotic Arm & Inverse Kinematics Kit',
-    description: 'Construct a 6-axis articulated robotic arm using STS3215 high-torque serial bus servos. Implement forward and inverse kinematics using Denavit-Hartenberg matrices.',
-    level: 'Advanced',
-    category: 'Kinematics',
-    hardwareKit: 'RoboArm Pro Kit (STS3215 Serial Bus Servos + Aluminium 6-Axis Frame)',
-    accentColor: '#8b5cf6',
-    modules: [
-      {
-        stageId: 'mod-arm-1',
-        moduleId: 'mod-arm-1',
-        title: 'Stage 1: UART Bus Protocol & Servo ID Assignment',
-        description: 'Configure half-duplex UART serial communication, assign unique IDs to each servo, and zero out home positions.',
-        durationMinutes: 30,
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-        hardwareChecklist: [
-          {
-            id: 'hw-arm-1',
-            name: 'STS3215 Magnetic Encoder Serial Servos (30kg-cm)',
-            quantity: 6,
-            description: 'High-precision metal gear serial bus servos with position/torque feedback.',
-            pinoutNotes: 'Half-duplex TTL single-wire UART at 1 Mbps.',
-          },
-          {
-            id: 'hw-arm-2',
-            name: '12V 5A DC Power Supply',
-            quantity: 1,
-            description: 'Dedicated high-current servo power rail.',
-          },
-        ],
-        wiringDiagrams: [
-          {
-            id: 'wd-arm-1',
-            title: 'Half-Duplex Serial Servo Daisy Chain',
-            diagramType: 'servo-bus',
-            description: 'Daisy-chain data signals across all 6 servos with common ground to the microcontroller.',
-            voltageWarning: 'Ensure 12V servo bus does not back-feed into the 3.3V logic pin of the MCU.',
-            pinConnections: [
-              { from: 'MCU TX/RX (Half-Duplex)', to: 'Servo 1 Data Pin', signalType: 'Serial', color: '#8b5cf6' },
-              { from: '12V Power Supply (+)', to: 'Servo Bus 12V Rail', signalType: 'Power', color: '#f43f5e' },
-              { from: '12V Power Supply (-)', to: 'MCU GND & Servo GND', signalType: 'Ground', color: '#64748b' },
-            ],
-          },
-        ],
-        codeSnippets: [
-          {
-            id: 'snip-arm-1',
-            filename: 'servo_bus_controller.cpp',
-            language: 'cpp',
-            description: 'Packet generation for STS3215 position read and write.',
-            code: `#include <Arduino.h>
-
-void setServoPosition(uint8_t id, uint16_t position, uint16_t timeMs) {
-  uint8_t packet[10];
-  packet[0] = 0xFF;
-  packet[1] = 0xFF;
-  packet[2] = id;
-  packet[3] = 7; // Length
-  packet[4] = 0x03; // Write instruction
-  packet[5] = 0x2A; // Position register
-  packet[6] = (position >> 8) & 0xFF;
-  packet[7] = position & 0xFF;
-  packet[8] = (timeMs >> 8) & 0xFF;
-  packet[9] = timeMs & 0xFF;
-  
-  Serial1.write(packet, sizeof(packet));
-}
-`,
-          },
-        ],
-      },
-    ],
-  },
-  {
-    projectId: 'crs-iot-greenhouse',
-    courseId: 'crs-iot-greenhouse',
-    title: 'Project 3: IoT Smart Greenhouse & Irrigation Kit',
-    description: 'Wire capacitive soil moisture sensors, a 5V optocoupled relay, and submersible water pump. Publish telemetry to AWS IoT Core over MQTT.',
+    projectId: 'skill-assembling-first-robot',
+    courseId: 'skill-assembling-first-robot',
+    title: 'Assembling Your First Robot',
+    description: 'Mount the dual yellow gearbox TT DC motors, align rubber wheels, fasten acrylic chassis plates, and wire the L298N driver for a differential-drive robot.',
     level: 'Beginner',
-    category: 'IoT & Cloud',
-    hardwareKit: 'AgriBot Kit (ESP32, Capacitive Sensor, 5V Relay, Mini Water Pump)',
-    accentColor: '#2bb398',
+    category: 'Robot Kits',
+    pathwayId: 'robot-kits',
+    hardwareKit: 'RoboRover Kit v2.4 (Acrylic Chassis, TT Motors, L298N, 2S LiPo)',
+    accentColor: '#dc2626',
     modules: [
       {
-        stageId: 'mod-gh-1',
-        moduleId: 'mod-gh-1',
-        title: 'Stage 1: Capacitive Moisture Sensing & Pump Relay Control',
-        description: 'Read analog soil capacitance, calibrate dry vs wet soil thresholds, and pulse the relay safely.',
-        durationMinutes: 20,
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+        stageId: 'stg-robot-1',
+        moduleId: 'stg-robot-1',
+        title: 'Stage 1: Mechanical Chassis Alignment & Wheel Mounting',
+        description: 'Mount the DC gearbox motors, align wheels, and establish square mechanical geometry.',
+        durationMinutes: 15,
+        videoUrl: LIVE_S3_HLS_URL,
         hardwareChecklist: [
-          {
-            id: 'hw-gh-1',
-            name: 'Capacitive Soil Moisture Sensor v1.2',
-            quantity: 1,
-            description: 'Corrosion-resistant analog capacitance sensor.',
-          },
-          {
-            id: 'hw-gh-2',
-            name: '1-Channel 5V Optocoupled Relay Module',
-            quantity: 1,
-            description: 'Isolates pump inductive flyback from microcontroller logic.',
-          },
+          { id: 'hw-ak-1', name: '4WD Laser-Cut Acrylic Chassis', quantity: 1, description: 'Dual-plate rigid chassis with M3 mounting holes.' },
+          { id: 'hw-ak-2', name: 'Yellow TT DC Gearbox Motors (1:48)', quantity: 2, description: 'High-torque 3V-6V geared motors.' },
+          { id: 'hw-ak-3', name: 'Rubber Grippy Wheels (65mm)', quantity: 2, description: 'High-traction rubber wheels.' },
+          { id: 'hw-ak-4', name: 'Front Ball Caster Wheel', quantity: 1, description: 'Low-friction omnidirectional caster.' },
+        ],
+        wiringDiagrams: [],
+        codeSnippets: [],
+      },
+      {
+        stageId: 'stg-robot-2',
+        moduleId: 'stg-robot-2',
+        title: 'Stage 2: L298N Dual H-Bridge & LiPo Power Wiring',
+        description: 'Wire high-current motor power rails and establish common logic ground reference.',
+        durationMinutes: 20,
+        videoUrl: 'https://robotics-lms-videos-processed-2026.s3.ap-southeast-2.amazonaws.com/projects/robot-kits/assembling-first-robot/stage2/hls/master.m3u8',
+        hardwareChecklist: [
+          { id: 'hw-ak-5', name: 'L298N Dual H-Bridge Module', quantity: 1, description: 'Controls motor direction and speed via PWM.' },
+          { id: 'hw-ak-6', name: '7.4V 2S LiPo Battery 2200mAh', quantity: 1, description: 'High-discharge power source for DC motors.' },
         ],
         wiringDiagrams: [
           {
-            id: 'wd-gh-1',
-            title: 'Optocoupled Relay & Flyback Diode Circuit',
-            diagramType: 'relay-pump',
-            description: 'Optocoupled relay isolation protecting MCU GPIO from pump coil spikes.',
-            voltageWarning: 'Ensure flyback diode 1N4007 is across the DC pump motor terminals to clamp back-EMF.',
+            id: 'wd-ak-1',
+            title: 'L298N Motor Driver to LiPo & Common Ground',
+            diagramType: 'l298n-motor',
+            description: 'Wire LiPo 7.4V to L298N power terminal. Tie LiPo GND to microcontroller GND.',
             pinConnections: [
-              { from: 'ESP32 GPIO 25', to: 'Relay IN Pin', signalType: 'GPIO', color: '#2bb398' },
-              { from: 'ESP32 3.3V', to: 'Moisture Sensor VCC', signalType: 'Power', color: '#f43f5e' },
-              { from: 'Moisture Sensor AOUT', to: 'ESP32 ADC1_CH0 (GPIO 36)', signalType: 'Analog', color: '#0ea5e9' },
+              { from: 'LiPo 7.4V (+)', to: 'L298N 12V Power Screw Terminal', signalType: 'Power', color: '#dc2626' },
+              { from: 'LiPo GND (-)', to: 'L298N GND Screw Terminal', signalType: 'Ground', color: '#0f172a' },
+              { from: 'MCU GND', to: 'L298N GND', signalType: 'Ground', color: '#64748b' },
             ],
           },
         ],
@@ -319,6 +73,358 @@ void setServoPosition(uint8_t id, uint16_t position, uint16_t timeMs) {
       },
     ],
   },
+  {
+    projectId: 'skill-debugging-dead-robot',
+    courseId: 'skill-debugging-dead-robot',
+    title: "Debugging a Robot That Won't Move",
+    description: 'Diagnose non-responsive robots using multimeter continuity tests, detect common-ground voltage drops, check PWM driver signals, and isolate brownouts.',
+    level: 'Intermediate',
+    category: 'Robot Kits',
+    pathwayId: 'robot-kits',
+    hardwareKit: 'Robotics Diagnostic Pack (Digital Multimeter, Logic Probes, Shunt Resistor)',
+    accentColor: '#dc2626',
+    modules: [
+      {
+        stageId: 'stg-debug-1',
+        moduleId: 'stg-debug-1',
+        title: 'Stage 1: Multimeter Continuity & Common Ground Check',
+        description: 'Verify continuity between MCU ground and driver ground. A floating ground is the #1 cause of dead robots.',
+        durationMinutes: 7,
+        videoUrl: LIVE_S3_HLS_URL,
+        hardwareChecklist: [
+          { id: 'hw-dbg-1', name: 'Digital Multimeter with Beep Continuity', quantity: 1, description: 'Tests resistance, continuity, and rail voltage.' },
+          { id: 'hw-dbg-2', name: 'Alligator Clip Test Leads', quantity: 4, description: 'For hands-free voltage monitoring.' },
+        ],
+        wiringDiagrams: [],
+        codeSnippets: [
+          {
+            id: 'snip-dbg-1',
+            filename: 'motor_test_toggle.ino',
+            language: 'arduino',
+            description: 'Slow 2-second toggle to test motor driver outputs with a multimeter.',
+            code: `void setup() {
+  pinMode(16, OUTPUT);
+  pinMode(17, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(16, HIGH);
+  digitalWrite(17, LOW);
+  delay(2000);
+  digitalWrite(16, LOW);
+  digitalWrite(17, HIGH);
+  delay(2000);
+}`,
+          },
+        ],
+      },
+      {
+        stageId: 'stg-debug-2',
+        moduleId: 'stg-debug-2',
+        title: 'Stage 2: Measuring In-Rush Current & Voltage Sag',
+        description: 'Measure motor start-up current spike to ensure the MCU 3.3V rail does not brown out.',
+        durationMinutes: 18,
+        videoUrl: 'https://robotics-lms-videos-processed-2026.s3.ap-southeast-2.amazonaws.com/projects/robot-kits/debugging-dead-robot/stage2/hls/master.m3u8',
+        hardwareChecklist: [],
+        wiringDiagrams: [],
+        codeSnippets: [],
+      },
+    ],
+  },
+
+  // =========================================================================
+  // CLUSTER 2: HOW AI THINKS
+  // =========================================================================
+  {
+    projectId: 'skill-how-machine-picks-next-word',
+    courseId: 'skill-how-machine-picks-next-word',
+    title: 'How a Machine Picks the Next Word',
+    description: 'Demystify Large Language Models and autoregressive token generation. Explore tokenization, embeddings, temperature sampling, and logits.',
+    level: 'Beginner',
+    category: 'How AI Thinks',
+    pathwayId: 'how-ai-thinks',
+    hardwareKit: 'Edge AI Compute Kit (Raspberry Pi 5 / Jetson Nano + OLED Display)',
+    accentColor: '#991b1b',
+    modules: [
+      {
+        stageId: 'stg-ai-1',
+        moduleId: 'stg-ai-1',
+        title: 'Stage 1: Tokenization, Vectors & Probability Distributions',
+        description: 'How text is chopped into token IDs and converted into multi-dimensional vectors.',
+        durationMinutes: 10,
+        videoUrl: LIVE_S3_HLS_URL,
+        hardwareChecklist: [
+          { id: 'hw-ai-1', name: 'Microcontroller / Single Board Computer', quantity: 1, description: 'Runs token lookup table and tokenizer model.' },
+        ],
+        wiringDiagrams: [],
+        codeSnippets: [
+          {
+            id: 'snip-ai-tok',
+            filename: 'next_word_picker.py',
+            language: 'python',
+            description: 'Softmax probability calculation and temperature sampling.',
+            code: `import math
+
+def softmax(logits, temperature=1.0):
+    exp_logits = [math.exp(x / temperature) for x in logits]
+    total = sum(exp_logits)
+    return [p / total for p in exp_logits]
+
+# Candidate words: ["robot", "rover", "arm", "sensor"]
+logits = [2.4, 3.1, 1.2, 0.5]
+probs = softmax(logits, temperature=0.7)
+print("Next Word Probabilities:", probs)`,
+          },
+        ],
+      },
+      {
+        stageId: 'stg-ai-2',
+        moduleId: 'stg-ai-2',
+        title: 'Stage 2: Self-Attention & Query-Key-Value Matrix Math',
+        description: 'Understand how attention matrices compute contextual relevance between words.',
+        durationMinutes: 18,
+        videoUrl: 'https://robotics-lms-videos-processed-2026.s3.ap-southeast-2.amazonaws.com/projects/how-ai-thinks/machine-picks-next-word/stage2/hls/master.m3u8',
+        hardwareChecklist: [],
+        wiringDiagrams: [],
+        codeSnippets: [],
+      },
+    ],
+  },
+  {
+    projectId: 'skill-computer-recognise-cat',
+    courseId: 'skill-computer-recognise-cat',
+    title: 'Teaching a Computer to Recognise a Cat',
+    description: 'Learn Convolutional Neural Networks (CNN) from scratch: pixel matrices, kernel filters, edge detection, pooling, and running vision models on embedded cameras.',
+    level: 'Intermediate',
+    category: 'How AI Thinks',
+    pathwayId: 'how-ai-thinks',
+    hardwareKit: 'ESP32-CAM AI Vision Kit (OV2640 Camera, Pan-Tilt Servos, Red Laser)',
+    accentColor: '#991b1b',
+    modules: [
+      {
+        stageId: 'stg-vision-1',
+        moduleId: 'stg-vision-1',
+        title: 'Stage 1: Pixels to Convolutions (Sobel Edge Filters)',
+        description: 'Pass 3x3 mathematical convolution kernels over pixels to identify edges, whiskers, and contours.',
+        durationMinutes: 14,
+        videoUrl: LIVE_S3_HLS_URL,
+        hardwareChecklist: [
+          { id: 'hw-cam-1', name: 'ESP32-CAM Module with OV2640', quantity: 1, description: 'Microcontroller with integrated 2MP camera sensor.' },
+          { id: 'hw-cam-2', name: 'FTDI USB-to-UART Programmer', quantity: 1, description: 'Flashes firmware to ESP32-CAM via 3.3V TX/RX.' },
+        ],
+        wiringDiagrams: [],
+        codeSnippets: [
+          {
+            id: 'snip-sobel',
+            filename: 'edge_filter.py',
+            language: 'python',
+            description: 'Apply Sobel horizontal edge kernel filter to pixel array.',
+            code: `sobel_x = [
+    [-1, 0, 1],
+    [-2, 0, 2],
+    [-1, 0, 1]
+]
+
+def apply_kernel(image_patch, kernel):
+    val = 0
+    for r in range(3):
+        for c in range(3):
+            val += image_patch[r][c] * kernel[r][c]
+    return abs(val)`,
+          },
+        ],
+      },
+    ],
+  },
+
+  // =========================================================================
+  // CLUSTER 3: SPACE AND HARDWARE
+  // =========================================================================
+  {
+    projectId: 'skill-how-rover-finds-way',
+    courseId: 'skill-how-rover-finds-way',
+    title: 'How a Rover Finds Its Way',
+    description: 'Autonomous exploration robotics: ultrasonic acoustic distance echo timing, wheel odometry encoder pulses, obstacle avoidance state machines, and micro-ROS.',
+    level: 'Beginner',
+    category: 'Space and Hardware',
+    pathwayId: 'space-and-hardware',
+    hardwareKit: 'Space Rover Kit (ESP32, HC-SR04 Sonar, Wheel Encoders, LiPo)',
+    accentColor: '#b91c1c',
+    modules: [
+      {
+        stageId: 'stg-rover-1',
+        moduleId: 'stg-rover-1',
+        title: 'Stage 1: Speed of Sound & Ultrasonic Sonar Echo Timing',
+        description: 'Trigger a 10-microsecond acoustic pulse and calculate centimeter distance from echo duration.',
+        durationMinutes: 11,
+        videoUrl: LIVE_S3_HLS_URL,
+        hardwareChecklist: [
+          { id: 'hw-snr-1', name: 'HC-SR04 Ultrasonic Sonar Sensor', quantity: 1, description: 'Measures 2cm to 400cm via 40kHz acoustic pulses.' },
+          { id: 'hw-snr-2', name: 'Voltage Divider Resistors (1k + 2k)', quantity: 2, description: 'Protects ESP32 3.3V pin from 5V Echo line.' },
+        ],
+        wiringDiagrams: [],
+        codeSnippets: [
+          {
+            id: 'snip-distance',
+            filename: 'sonar_distance.ino',
+            language: 'arduino',
+            description: 'Microsecond pulse measurement for distance calculation.',
+            code: `const int trigPin = 5;
+const int echoPin = 18;
+
+void setup() {
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  Serial.begin(115200);
+}
+
+void loop() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration = pulseIn(echoPin, HIGH);
+  float distanceCm = duration * 0.0343 / 2;
+  Serial.printf("Distance: %.1f cm\\n", distanceCm);
+  delay(100);
+}`,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    projectId: 'skill-motors-torque-gears',
+    courseId: 'skill-motors-torque-gears',
+    title: 'Motors, Torque, and Why Gears Matter',
+    description: 'Master rotational mechanics: gear ratios, trade-off between RPM and output torque, motor stall currents, and controlling 6-axis robotic arm actuators.',
+    level: 'Intermediate',
+    category: 'Space and Hardware',
+    pathwayId: 'space-and-hardware',
+    hardwareKit: '6-DOF Articulated Robotic Arm Kit (STS3215 Magnetic Servos + Aluminium Frame)',
+    accentColor: '#b91c1c',
+    modules: [
+      {
+        stageId: 'stg-torque-1',
+        moduleId: 'stg-torque-1',
+        title: 'Stage 1: Gear Ratio Math & Output Torque Multiplication',
+        description: 'Why a 1:48 gearbox increases torque 48x while reducing shaft speed proportionally.',
+        durationMinutes: 8,
+        videoUrl: LIVE_S3_HLS_URL,
+        hardwareChecklist: [
+          { id: 'hw-tq-1', name: 'STS3215 High-Torque Serial Bus Servo (30kg-cm)', quantity: 1, description: 'Heavy-duty steel gear actuator with position telemetry.' },
+          { id: 'hw-tq-2', name: '12V 5A High-Amperage Power Supply', quantity: 1, description: 'Powers servo bus without voltage drops.' },
+        ],
+        wiringDiagrams: [],
+        codeSnippets: [],
+      },
+    ],
+  },
+
+  // =========================================================================
+  // CLUSTER 4: PROMPTING AND CODE
+  // =========================================================================
+  {
+    projectId: 'skill-first-prompt-works',
+    courseId: 'skill-first-prompt-works',
+    title: 'Your First Prompt That Works',
+    description: 'Learn prompt engineering techniques for software and hardware developers: defining strict output formats, system roles, few-shot examples, and preventing hallucinations.',
+    level: 'Beginner',
+    category: 'Prompting and Code',
+    pathwayId: 'prompting-and-code',
+    hardwareKit: 'Web IDE Starter Kit (Google Blockly Visual Coding + Monaco Text Editor)',
+    accentColor: '#b45309',
+    modules: [
+      {
+        stageId: 'stg-prompt-1',
+        moduleId: 'stg-prompt-1',
+        title: 'Stage 1: Role, Context, Task & Constraint (RCTC Framework)',
+        description: 'Structure your developer prompts to generate production-ready code with zero syntax errors.',
+        durationMinutes: 9,
+        videoUrl: LIVE_S3_HLS_URL,
+        hardwareChecklist: [],
+        wiringDiagrams: [],
+        codeSnippets: [
+          {
+            id: 'snip-prompt-template',
+            filename: 'prompt_template.md',
+            language: 'python',
+            description: 'Production prompt template for microcontroller code generation.',
+            code: `# SYSTEM ROLE
+You are an expert embedded C++ developer writing code for the ESP32.
+
+# TASK
+Write a non-blocking ultrasonic sensor reader using hardware interrupts.
+
+# CONSTRAINTS
+- Return ONLY valid C++ code inside a single markdown code fence.
+- Do NOT use delay(). Use millis() timing loops.
+- Include pin definitions for ESP32 GPIO 5 (TRIG) and GPIO 18 (ECHO).`,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    projectId: 'skill-code-snippets-reuse',
+    courseId: 'skill-code-snippets-reuse',
+    title: "Code Snippets You'll Reuse",
+    description: 'Build a battle-tested library of embedded C++ patterns: non-blocking millis() schedulers, software debouncing, circular serial buffers, and PID motor controllers.',
+    level: 'Intermediate',
+    category: 'Prompting and Code',
+    pathwayId: 'prompting-and-code',
+    hardwareKit: 'ESP32 IoT Dev Kit (ESP-WROOM-32, USB-C Data Cable, Breadboard, LEDs)',
+    accentColor: '#b45309',
+    modules: [
+      {
+        stageId: 'stg-snippets-1',
+        moduleId: 'stg-snippets-1',
+        title: 'Stage 1: The Non-Blocking millis() State Scheduler',
+        description: 'Never use delay() in robotics! Learn how to run motors, read sensors, and blink LEDs concurrently.',
+        durationMinutes: 12,
+        videoUrl: LIVE_S3_HLS_URL,
+        hardwareChecklist: [
+          { id: 'hw-snp-1', name: 'ESP32 DevKit V1 Board', quantity: 1, description: '38-pin dual-core development microcontroller.' },
+        ],
+        wiringDiagrams: [],
+        codeSnippets: [
+          {
+            id: 'snip-millis',
+            filename: 'async_scheduler.ino',
+            language: 'arduino',
+            description: 'Non-blocking task scheduler without delays.',
+            code: `unsigned long lastSensorRead = 0;
+unsigned long lastMotorUpdate = 0;
+
+void setup() {
+  Serial.begin(115200);
+}
+
+void loop() {
+  unsigned long now = millis();
+
+  // Task 1: Read sensor every 100ms
+  if (now - lastSensorRead >= 100) {
+    lastSensorRead = now;
+    readSonar();
+  }
+
+  // Task 2: Update motor PWM every 20ms
+  if (now - lastMotorUpdate >= 20) {
+    lastMotorUpdate = now;
+    updateMotorControl();
+  }
+}
+
+void readSonar() { /* Non-blocking echo */ }
+void updateMotorControl() { /* Compute PID */ }`,
+          },
+        ],
+      },
+    ],
+  },
 ];
 
-export const SAMPLE_COURSES = SAMPLE_PROJECTS; // Backward compatibility
+export const SAMPLE_COURSES = SAMPLE_PROJECTS;

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { UserProgress } from '../types/course';
-import { SAMPLE_COURSES } from '../lib/mockData';
+import { projectService } from '../services/projectService';
 import { useAuth } from './AuthContext';
 import { progressApi } from '../services/progressApi';
 
@@ -46,35 +46,34 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
       }
 
-      // Default seed data for student demo
-      if (!currentMap['crs-esp32-rover']) {
-        currentMap['crs-esp32-rover'] = {
-          userId: user.userId,
-          courseId: 'crs-esp32-rover',
-          completionPercentage: 50,
-          completedModules: ['mod-1'],
-          examScore: undefined,
-          lastUpdated: new Date().toISOString(),
-        };
-      }
-      if (!currentMap['crs-robotic-arm-kinematics']) {
-        currentMap['crs-robotic-arm-kinematics'] = {
-          userId: user.userId,
-          courseId: 'crs-robotic-arm-kinematics',
-          completionPercentage: 0,
-          completedModules: [],
-          examScore: undefined,
-          lastUpdated: new Date().toISOString(),
-        };
+      // Initialize genuine zero progress for all active projects from DB/registry
+      const registeredProjects = projectService.getAllProjects();
+      for (const proj of registeredProjects) {
+        const id = proj.projectId || proj.courseId;
+        if (!currentMap[id]) {
+          currentMap[id] = {
+            userId: user.userId,
+            courseId: id,
+            completionPercentage: 0,
+            completedModules: [],
+            examScore: undefined,
+            lastUpdated: new Date().toISOString(),
+          };
+        }
       }
 
-      // Try fetching remote progress from DynamoDB if API Gateway is configured
+      // Sync with live AWS DynamoDB LMS_Progress if configured
       try {
-        const remoteCourse1 = await progressApi.fetchProgress(user.userId, 'crs-esp32-rover');
-        if (remoteCourse1) {
-          currentMap['crs-esp32-rover'] = remoteCourse1;
+        for (const proj of registeredProjects.slice(0, 3)) {
+          const id = proj.projectId || proj.courseId;
+          const remote = await progressApi.fetchProgress(user.userId, id);
+          if (remote) {
+            currentMap[id] = remote;
+          }
         }
-      } catch {}
+      } catch (syncErr) {
+        console.warn('[ProgressContext] AWS sync note:', syncErr);
+      }
 
       setProgressMap(currentMap);
       localStorage.setItem(storageKey, JSON.stringify(currentMap));
@@ -116,9 +115,9 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
     completedSet.add(moduleId);
     const completedModules = Array.from(completedSet);
 
-    // Calculate percentage based on course modules count
-    const targetCourse = SAMPLE_COURSES.find((c) => c.courseId === courseId);
-    const totalModules = targetCourse ? targetCourse.modules.length : completedModules.length;
+    // Calculate percentage based on project modules count
+    const targetProject = projectService.getProjectById(courseId);
+    const totalModules = targetProject && targetProject.modules.length > 0 ? targetProject.modules.length : Math.max(1, completedModules.length);
     const completionPercentage = Math.round((completedModules.length / totalModules) * 100);
 
     const localRecord: UserProgress = {
@@ -180,10 +179,29 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
   );
 };
 
+const DEFAULT_FALLBACK_PROGRESS: UserProgress = {
+  userId: 'guest',
+  courseId: '',
+  completionPercentage: 0,
+  completedModules: [],
+};
+
+const DEFAULT_PROGRESS_CONTEXT: ProgressContextType = {
+  progressMap: {},
+  markModuleComplete: async () => DEFAULT_FALLBACK_PROGRESS,
+  isModuleCompleted: () => false,
+  getCourseProgress: (courseId: string) => ({
+    userId: 'guest',
+    courseId,
+    completionPercentage: 0,
+    completedModules: [],
+  }),
+  resetCourseProgress: () => {},
+  isLoading: false,
+  isSyncingWithAWS: false,
+};
+
 export const useProgress = () => {
   const context = useContext(ProgressContext);
-  if (!context) {
-    throw new Error('useProgress must be used within a ProgressProvider');
-  }
-  return context;
+  return context || DEFAULT_PROGRESS_CONTEXT;
 };
